@@ -11,3 +11,4 @@ Requirements
 * Python 2.7
 * numpy (pip install numpy)
 * opencv
+* matplotlib
