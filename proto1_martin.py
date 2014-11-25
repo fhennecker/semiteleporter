@@ -22,7 +22,7 @@ def substract(sub_path, base_path, noise=20):
 def filterNoise(img):
     # this method apply a filter to delete alone pixels
     img = cv2.GaussianBlur(img,(5,5),0)
-    ret, img = cv2.threshold(img, 70, 255, cv2.THRESH_TOZERO)
+    ret, img = cv2.threshold(img, 63, 255, cv2.THRESH_TOZERO)
 
     return img
 
@@ -76,8 +76,8 @@ if(__name__ == "__main__"):
 
     img = substract("./demo/vaselaser.jpg", "./demo/vase.jpg")
     img = filterNoise(img);
-#   img = toLines(img, np.zeros(img.shape, dtype=np.uint8), True)
-    img = toLines(img, img, True)
+    img = toLines(img, np.zeros(img.shape, dtype=np.uint8), True)
+#   img = toLines(img, img, True)
     plt.imshow(img)
     plt.show()
 
