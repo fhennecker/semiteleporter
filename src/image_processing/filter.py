@@ -73,10 +73,11 @@ def plot(img):
 
 
 if(__name__ == "__main__"):
-
-    img = substract("./demo/vaselaser.jpg", "./demo/vase.jpg")
+    from sys import argv
+    img = substract(argv[1], argv[2])
     img = filterNoise(img);
     img = toLines(img, np.zeros(img.shape, dtype=np.uint8), True)
+    cv2.imwrite(argv[3], img)
 #   img = toLines(img, img, True)
     plt.imshow(img)
     plt.show()
