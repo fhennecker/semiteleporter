@@ -62,7 +62,7 @@ def findPoints(img, display=False):
             offset = limit
 
 def toLines(img, output, display=False):
-    for x, y in _findPoints(img, display):
+    for x, y in findPoints(img, display):
         output[y][x] = np.array([0, 0, 255])
     return output
 
