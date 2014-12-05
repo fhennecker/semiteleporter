@@ -1,6 +1,14 @@
 /*
   3DScan
+  This driver controls a ULN2003 driver
   H.P.
+  Commands are :
+  0 : Diode OFF
+  1 : Diode ON
+  2 : one step
+  4 : change direction (no step)
+  5 : 1024 steps for a test
+  9 : power off
  */
 int Pin0 = 8;
 int Pin1 = 9;
