@@ -18,14 +18,11 @@ def substract(sub_path, base_path, noise=20):
 
     return res
 
-
 def filterNoise(img):
     # this method apply a filter to delete alone pixels
     img = cv2.GaussianBlur(img,(5,5),0)
     ret, img = cv2.threshold(img, 63, 255, cv2.THRESH_TOZERO)
-
     return img
-
 
 def cutBetweenLasers(img, display=False, pixels=[]):
     # this method return the line which cut the picture between laser lines
@@ -52,8 +49,7 @@ def cutBetweenLasers(img, display=False, pixels=[]):
 
     return img, between
 
-
-def toLines(img, output, display=False):
+def findPoints(img, display=False):
     # this method try to find the mass center of each side of the picture
     img, between = cutBetweenLasers(img, display)
 
@@ -61,16 +57,14 @@ def toLines(img, output, display=False):
         offset = 0
         for side in (img[line,:limit,2],img[line,limit:,2]):
             moments = cv2.moments(side)
-            if(moments['m00'] != 0):
-                output[line][moments['m01']/moments['m00']+offset] = np.array([255,0,0], dtype=np.uint8)
+            if moments['m00'] != 0:
+                yield moments['m01']/moments['m00']+offset, line
             offset = limit
 
+def toLines(img, output, display=False):
+    for x, y in _findPoints(img, display):
+        output[y][x] = np.array([0, 0, 255])
     return output
-
-
-def plot(img):
-    pass
-
 
 if(__name__ == "__main__"):
     from sys import argv
@@ -81,5 +75,3 @@ if(__name__ == "__main__"):
 #   img = toLines(img, img, True)
     plt.imshow(img)
     plt.show()
-
-    plot(img);
