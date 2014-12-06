@@ -29,6 +29,7 @@ def filterNoise(img):
 
 
 def massCenter(img, output, limit=None):
+    # this method search the mass center of the red color by line in each area delimited by limit
     height,x,y = 0,0,0
     parts = []
     res = [[],[]]
@@ -61,6 +62,7 @@ def massCenter(img, output, limit=None):
 
 
 def linearRegression(points, output=None):
+    # this method make a linear regression with all points
     x,y = np.array(points).T
     param = np.linalg.lstsq(np.array([y, np.ones(y.shape)]).T, x)[0]
     line = np.array([param[0]*y+param[1],y]).T
@@ -74,6 +76,7 @@ def linearRegression(points, output=None):
 
 
 def display(img, title):
+    # this method display result (for demo)
     cv2.imshow(title, img)
     cv2.waitKey(0)
 
