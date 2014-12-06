@@ -1,0 +1,128 @@
+# -*- coding: utf-8 -*-
+
+import numpy as np
+from pylab import imread
+from math import sin, cos, tan, atan, asin, pi, hypot
+import json
+from filter import findPoints, filterNoise, substract
+
+def deg2rad(x): return pi*float(x)/180
+def rad2deg(x): return 180*float(x)/pi
+
+# Mesures
+L = 532.0   # Distance de la camera au centre du plateau (mm)
+H_C = 390.0 # Hauteur de la camera (mm)
+H_P = 185.0 # Hauteur du plateau (mm)
+
+GAMMA_D = -deg2rad(83) # Angle entre le laser gauche et le plan de l'image
+GAMMA_G = deg2rad(78)  # Angle entre le laser droit et le plan de l'image
+ALPHA = atan(280/L)    # Angle d'ouverture horizontal de la camera
+
+# Calibration: centre du plateau sur l'image (en pixels)
+CX, CY = 317, 310
+
+# Deductions
+H_RELATIVE = H_C - H_P # Hauteur relative de la camera par rapport au plateau
+DELTA = asin(H_RELATIVE/L) # Angle de plongée de la caméra
+CAM = np.array([0, -L, H_RELATIVE]) # Position de la camera
+
+
+def position(gamma, theta, phi):
+    """
+    Renvoie la position du point à l'intersection
+    - Du laser qui forme un angle gamma avec le plan de l'image
+    - Du rayon de la camera
+      - d'angle horizontal theta (gauche < 0 < droit)
+      - d'angle vertical phi (bas < 0 < haut)
+    Renvoie un point (np.array)
+    """
+    # vecteur directeur du rayon sortant de la camera
+    ray = np.array([sin(theta), cos(theta), sin(phi-DELTA)])
+    laser = np.array([L * tan(pi/2 - gamma), 0, 0])
+    
+    # Matrice tq (matrix) * (l, m, z) = (laser)
+    matrix = np.array([
+        [cos(gamma), 0, sin(theta)],
+        [sin(gamma), 0, cos(theta)],
+        [         0, 1, sin(phi-DELTA)]
+    ])
+    l, m, z = np.linalg.solve(matrix, -laser)
+    return CAM + z * ray
+
+
+def theta_phi(alpha, image_shape, position):
+    """
+    Renvoie la paire d'angle (horizontal, vertical) qu'a le rayon sortant de la
+    camera, à la position donnée (en pixel), par rapport à la forme de l'image
+    (en pixels), et l'angle d'ouverture horizontal de la camera (alpha)
+    Renvoie un tuple d'angles en radians
+    """
+    x, y = map(float, position)
+    w, h = map(float, image_shape)
+    ratio = w/h
+    beta = alpha / ratio
+    theta = (x - CX)/(w/2) * alpha
+    phi = (CY - y)/(h/2) * beta
+    return theta, phi
+
+
+def extract_points(with_lasers_path, without_lasers_path):
+    """
+    Extrait les points en 3D d'une paire d'images (avec et sans lasers).
+    On passe le chemin des images. Renvoie une liste de np.arrays
+    """
+    image = filterNoise(substract(with_lasers_path, without_lasers_path))
+    H, W = image.shape[:2]
+    res = []
+    for j, i in findPoints(image):
+        theta, phi = theta_phi(ALPHA, [W, H], [j, i])
+        if theta > 0:
+            continue
+        res.append(position(GAMMA_G, theta, phi))
+    return res
+
+
+def build_3d():
+    """
+    Construit un modèle 3D a partir des images (hardcode pour le moment)
+    """
+    XYZ = []
+    for photo_num in range(2, 32):
+        angle = photo_num*pi/16
+        ROTMATRIX = np.array([
+            [ cos(angle), sin(angle), 0], 
+            [-sin(angle), cos(angle), 0], 
+            [          0,          0, 1]
+        ])
+        PHOTO_ON, PHOTO_OFF = "imgs/%02d.png"%(2*photo_num), "imgs/%02d.png"%(2*photo_num+1)
+        try:
+            XYZ += [p.dot(ROTMATRIX) for p in extract_points(PHOTO_ON, PHOTO_OFF)]
+            print "Done with %d (have %d points)" % (photo_num, len(XYZ))
+        except:
+            print "Error with %d" % (photo_num)
+    return XYZ
+
+
+# ## Et oui, on aime les graphiques !
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    try:
+        XYZ = json.load(open("XYZ.json"))
+    except:
+        XYZ = build_3d()
+
+    fig = plt.figure()
+    R = 250
+    disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
+    ax = fig.add_subplot(111, projection='3d', aspect="equal")
+    X, Y, Z = zip(*XYZ)
+    ax.scatter(X, Y, Z, '.', s=2)
+    diskX, diskY, diskZ = zip(*disk)
+    ax.plot(diskX, diskY, diskZ, '.', color='g', alpha=0.25)
+    ax.set_xlim(-R, R)
+    ax.set_ylim(-R, R)
+    ax.set_zlim(-R, R)
+    plt.show()
+
+    json.dump(map(list, XYZ), open("XYZ.json", "w"))
