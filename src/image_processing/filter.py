@@ -1,6 +1,7 @@
+from sys import argv
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 def substract(sub_path, base_path, noise=20):
     # this method substract base from sub
@@ -18,60 +19,79 @@ def substract(sub_path, base_path, noise=20):
 
     return res
 
+
+
 def filterNoise(img):
     # this method apply a filter to delete alone pixels
     img = cv2.GaussianBlur(img,(5,5),0)
     ret, img = cv2.threshold(img, 63, 255, cv2.THRESH_TOZERO)
     return img
 
-def cutBetweenLasers(img, display=False, pixels=[]):
-    # this method return the line which cut the picture between laser lines
-    y = []
-    x = []
-    red = img[:,:,2]
 
-    for line in range(img.shape[0]):
-        moments = cv2.moments(red[line,:])
-        if(moments['m00'] != 0):
-            grav_x = moments['m01']/moments['m00']
-            y.append(grav_x)
-            x.append(line)
+def massCenter(img, output, limit=None):
+    height,x,y = 0,0,0
+    parts = []
+    res = [[],[]]
 
-            if(display):
-                img[line][np.round(grav_x)] = np.array([0,255,0], dtype=np.uint8)
+    if(limit == None):
+        height = img.shape[0]
+    else:
+        height = len(limit)
 
-    param = np.linalg.lstsq(np.array([x, np.ones(len(x))]).T, y)[0]
-    between = np.array([x,param[0]*np.array(x)+param[1]]).T
+    for line in range(height):
+        if(limit == None):
+            x,y = img.shape[1], line
+            parts = [img[y,:,2]]
+        else:
+            x,y = limit[line]
+            parts = [img[y,:x,2], img[y,x:,2]]
+            
+        for side in range(len(parts)):
+            moments = cv2.moments(parts[side])
+            if(moments['m00'] != 0):
+                point = [moments['m01']/moments['m00']+x*side, y]
+                res[side].append(point)
+                if(output != None):
+                    output[point[1]][point[0]] =  np.array([0,255,0], dtype=np.uint8)
 
-    if(display):
-        for line, limit in between:
-            img[line][limit] = np.array([255,0,0], dtype=np.uint8)
+    if(limit == None):
+        return res[0]
+    else:
+        return res
 
-    return img, between
 
-def findPoints(img, display=False):
-    # this method try to find the mass center of each side of the picture
-    img, between = cutBetweenLasers(img, display)
+def linearRegression(points, output=None):
+    x,y = np.array(points).T
+    param = np.linalg.lstsq(np.array([y, np.ones(y.shape)]).T, x)[0]
+    line = np.array([param[0]*y+param[1],y]).T
 
-    for line, limit in between:
-        offset = 0
-        for side in (img[line,:limit,2],img[line,limit:,2]):
-            moments = cv2.moments(side)
-            if moments['m00'] != 0:
-                yield moments['m01']/moments['m00']+offset, line
-            offset = limit
+    if(output != None):
+        for x,y in line:
+            output[y][x] = np.array([255,0,0], dtype=np.uint8)
 
-def toLines(img, output, display=False):
-    for x, y in _findPoints(img, display):
-        output[y][x] = np.array([0, 0, 255])
-    return output
+    return line
+
+
+
+def display(img, title):
+    cv2.imshow(title, img)
+    cv2.waitKey(0)
+
+
 
 if(__name__ == "__main__"):
-    from sys import argv
     img = substract(argv[1], argv[2])
+    display(img, "Substraction result")
+
     img = filterNoise(img);
-    img = toLines(img, np.zeros(img.shape, dtype=np.uint8), True)
-    cv2.imwrite(argv[3], img)
-#   img = toLines(img, img, True)
-    plt.imshow(img)
-    plt.show()
+    display(img, "soft filter to delete noise")
+
+    points = massCenter(img,img)
+    display(img,"First mass center step")
+
+    points = linearRegression(points, img)
+    display(img, "linear regression result")
+
+    res = np.zeros(img.shape, dtype=np.uint8)
+    massCenter(img, res, points)
+    display(res,"Second mass center step to fit lasers")
