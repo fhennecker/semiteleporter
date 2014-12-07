@@ -5,6 +5,7 @@ from pylab import imread
 from math import sin, cos, tan, atan, asin, pi, hypot
 import json
 from filter import findPoints, filterNoise, substract
+from multiprocessing import Pool
 
 def deg2rad(x): return pi*float(x)/180
 def rad2deg(x): return 180*float(x)/pi
@@ -66,40 +67,53 @@ def theta_phi(alpha, image_shape, position):
     return theta, phi
 
 
-def extract_points(with_lasers_path, without_lasers_path):
+def extract_points(with_lasers_path, without_lasers_path, angle):
     """
     Extrait les points en 3D d'une paire d'images (avec et sans lasers).
-    On passe le chemin des images. Renvoie une liste de np.arrays
+    On passe le chemin des images, et l'angle de rotation du plateau. 
+    Renvoie une liste de np.arrays (les points en 3D)
     """
-    image = filterNoise(substract(with_lasers_path, without_lasers_path))
-    H, W = image.shape[:2]
     res = []
-    for j, i in findPoints(image):
-        theta, phi = theta_phi(ALPHA, [W, H], [j, i])
-        if theta > 0:
-            continue
-        res.append(position(GAMMA_G, theta, phi))
-    return res
-
-
-def build_3d():
-    """
-    Construit un modèle 3D a partir des images (hardcode pour le moment)
-    """
-    XYZ = []
-    for photo_num in range(2, 32):
-        angle = photo_num*pi/16
+    try:
+        image = filterNoise(substract(with_lasers_path, without_lasers_path))
+        H, W = image.shape[:2]
+        # Matrice de rotation (x,y tournent autour du centre du plateau, z inchangé)
         ROTMATRIX = np.array([
             [ cos(angle), sin(angle), 0], 
             [-sin(angle), cos(angle), 0], 
             [          0,          0, 1]
         ])
-        PHOTO_ON, PHOTO_OFF = "imgs/%02d.png"%(2*photo_num), "imgs/%02d.png"%(2*photo_num+1)
-        try:
-            XYZ += [p.dot(ROTMATRIX) for p in extract_points(PHOTO_ON, PHOTO_OFF)]
-            print "Done with %d (have %d points)" % (photo_num, len(XYZ))
-        except:
-            print "Error with %d" % (photo_num)
+        for j, i in findPoints(image):
+            theta, phi = theta_phi(ALPHA, [W, H], [j, i])
+            if theta > 0:
+                continue
+            res.append(position(GAMMA_G, theta, phi).dot(ROTMATRIX))
+        print "\033[32mDone with %s-%s\033[0m" % (with_lasers_path, without_lasers_path)
+    except:
+        print "\033[31mError with %s-%s\033[0m" % (with_lasers_path, without_lasers_path)
+    return res
+
+
+def wrap_extract_points(args):
+    return extract_points(*args)
+
+
+def build_3d(first_img_num=2, last_img_num=32, n_workers=4):
+    """
+    Construit un modèle 3D a partir des images (hardcode pour le moment).
+    Utilise n_workers threads pour faire les calculs en parallèle
+    """
+    workers = Pool(processes=n_workers)
+    workers_args = [
+        (
+            "imgs/%02d.png"%(2*i), 
+            "imgs/%02d.png"%(2*i+1), 
+            i*pi/16
+        ) 
+    for i in range(first_img_num, last_img_num)]
+
+    # Unpack des arguments pour extract_points
+    XYZ = sum(workers.map(wrap_extract_points, workers_args), [])
     return XYZ
 
 
@@ -107,10 +121,7 @@ def build_3d():
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
-    try:
-        XYZ = json.load(open("XYZ.json"))
-    except:
-        XYZ = build_3d()
+    XYZ = build_3d(n_workers=8)
 
     fig = plt.figure()
     R = 250
@@ -124,5 +135,3 @@ if __name__ == "__main__":
     ax.set_ylim(-R, R)
     ax.set_zlim(-R, R)
     plt.show()
-
-    json.dump(map(list, XYZ), open("XYZ.json", "w"))
