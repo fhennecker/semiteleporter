@@ -28,7 +28,7 @@ def filterNoise(img):
     return img
 
 
-def massCenter(img, output, limit=None):
+def massCenter(img, limit=None, output=None):
     # this method search the mass center of the red color by line in each area delimited by limit
     height,x,y = 0,0,0
     parts = []
@@ -89,12 +89,12 @@ if(__name__ == "__main__"):
     img = filterNoise(img);
     display(img, "soft filter to delete noise")
 
-    points = massCenter(img,img)
+    points = massCenter(img, None, img)
     display(img,"First mass center step")
 
     points = linearRegression(points, img)
     display(img, "linear regression result")
 
     res = np.zeros(img.shape, dtype=np.uint8)
-    massCenter(img, res, points)
+    massCenter(img, points, res)
     display(res,"Second mass center step to fit lasers")
