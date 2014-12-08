@@ -13,7 +13,7 @@ def substract(sub_path, base_path):
     res *= mask
 
     res -= base
-    ret, res = cv2.threshold(res, 0, 255, cv2.THRESH_TOZERO)
+    res = res.clip(0)
 
     return np.array(res, dtype=np.uint8)
 
