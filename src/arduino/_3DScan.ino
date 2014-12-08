@@ -3,9 +3,10 @@
   This driver controls a ULN2003 driver
   H.P.
   Commands are :
-  0 : Diode OFF
-  1 : Diode ON
-  2 : one step
+  0 : Diodes 1 & 2 OFF
+  1 : Diode 1 ON
+  2 : Diode 2 ON
+  3 : one step
   4 : change direction (no step)
   5 : 1024 steps for a test
   9 : power off
@@ -14,6 +15,8 @@ int Pin0 = 8;
 int Pin1 = 9;
 int Pin2 = 10;
 int Pin3 = 11;
+int diode1 = 12;
+int diode2 = 13;
 int _step = 0;
 int cmd=0;
 boolean dir = true;
@@ -24,8 +27,8 @@ void setup() {
  pinMode(Pin1, OUTPUT);  
  pinMode(Pin2, OUTPUT);  
  pinMode(Pin3, OUTPUT);
- pinMode(13, OUTPUT);
-// PIN 13 commands the lasers 
+ pinMode(diode1, OUTPUT);
+ pinMode(diode2, OUTPUT);
 }
 
 void loop() {
@@ -35,36 +38,37 @@ void loop() {
   //cmd is an integer 0-9
     Serial.println(cmd);
   //feedback a trace of the command
-  switch(cmd){
-    case 0:
-    // lasers OFF
-      digitalWrite(13, LOW);
-      break;
-    case 1:
-    // lasers ON
-      digitalWrite(13, HIGH);
-      break;
-      
-    case 4:
-    // change direction
-      dir=! dir;
-      break;
-      
-    case 5:
-    // 1024 steps for a test
-      for (int i=0;i<1024;i++) {
-        step();
-        delay(10); }
-      break;
-      
+  switch(cmd){    
     case 9:
     // power off
      digitalWrite(Pin0, LOW);  
      digitalWrite(Pin1, LOW);
      digitalWrite(Pin2, LOW);
      digitalWrite(Pin3, LOW);
-     break;
-     
+    case 0:
+    // lasers OFF
+      digitalWrite(diode1, LOW);
+      digitalWrite(diode2, LOW);
+      break;
+    case 1:
+    // laser 1 ON
+      digitalWrite(diode1, HIGH);
+      break;
+    case 2:
+    // laser 2 ON
+      digitalWrite(diode2, HIGH);
+      break;
+    case 4:
+    // change direction
+      dir=! dir;
+      break;
+    case 5:
+    // 1024 steps for a test
+      for (int i=0;i<1024;i++) {
+        step();
+        delay(10); }
+      break;
+
     default:
       step();
   }

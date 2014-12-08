@@ -3,14 +3,18 @@
   This driver controls a easydriver
   H.P.
   Commands are :
-  0 : Diode OFF
-  1 : Diode ON
-  2 : one step
+  0 : Diodes 1 & 2 OFF
+  1 : Diode 1 ON
+  2 : Diode 2 ON
+  3 : one step
   4 : change direction (no step)
   5 : 1024 steps for a test
+  9 : power off
  */
 int dirPin = 2;
 int stepperPin = 3;
+int diode1 = 12;
+int diode2 = 13;
 int cmd=0;
 boolean dir = true;
 
@@ -19,8 +23,8 @@ void setup() {
  pinMode(dirPin, OUTPUT);
  digitalWrite(dirPin,dir);
  pinMode(stepperPin, OUTPUT);
- pinMode(13, OUTPUT);
-// PIN 13 commands the lasers 
+ pinMode(diode1, OUTPUT);
+ pinMode(diode2, OUTPUT);
 }
 
 void loop() {
@@ -31,32 +35,32 @@ void loop() {
     Serial.println(cmd);
   //feedback a trace of the command
   switch(cmd){
+    case 9:
     case 0:
     // lasers OFF
-      digitalWrite(13, LOW);
+      digitalWrite(diode1, LOW);
+      digitalWrite(diode2, LOW);
       break;
     case 1:
-    // lasers ON
-      digitalWrite(13, HIGH);
+    // laser 1 ON
+      digitalWrite(diode1, HIGH);
       break;
-      
+    case 2:
+    // laser 2 ON
+      digitalWrite(diode2, HIGH);
+      break;      
     case 4:
     // change direction
       dir=! dir;
       digitalWrite(dirPin,dir);
       break;
-      
-    case 5:
+     case 5:
     // 1024 steps for a test
       for (int i=0;i<1024;i++) {
         step();
         delay(10); }
       break;
-      
-    case 9:
-    // power off
-     break;
-     
+    
     default:
       step();
   }
