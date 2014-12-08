@@ -3,28 +3,26 @@ import cv2
 import numpy as np
 
 
-def substract(sub_path, base_path, noise=20):
+def substract(sub_path, base_path):
     # this method substract base from sub
-    res = cv2.imread(sub_path)
+    res = np.array(cv2.imread(sub_path), dtype=np.int16)
     base = cv2.imread(base_path)
 
-    for line in range(res.shape[0]):
-        for pixel in range(res.shape[1]):
+    mask = np.array((res.shape[0],res.shape[1],res.shape[2]))
+    mask[:] = [0,0,1]
+    res *= mask
 
-            if(((int(res[line][pixel][2]) - int(base[line][pixel][2])) < noise)):
-                res[line][pixel][2] = 0
+    res -= base
+    ret, res = cv2.threshold(res, 0, 255, cv2.THRESH_TOZERO)
 
-            res[line][pixel][0] = 0
-            res[line][pixel][1] = 0
-
-    return res
+    return np.array(res, dtype=np.uint8)
 
 
 
 def filterNoise(img):
     # this method apply a filter to delete alone pixels
     img = cv2.GaussianBlur(img,(5,5),0)
-    ret, img = cv2.threshold(img, 63, 255, cv2.THRESH_TOZERO)
+    ret, img = cv2.threshold(img, 35, 255, cv2.THRESH_TOZERO)
     return img
 
 
