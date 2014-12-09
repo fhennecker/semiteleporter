@@ -14,9 +14,6 @@ def degToRad(degree):
 
 def triangulation(points, L, H, k, gamma, alpha):
     res = []
-    L = float(L)
-    H = float(H)
-    k = float(k)
     dy = L/(2*tan(alpha/2))
 
     for side in points:
@@ -25,7 +22,7 @@ def triangulation(points, L, H, k, gamma, alpha):
             l = l -L/2
             h = H/2 -h
 
-            rho = k/(denom_const+l)
+            rho = float(k)/(denom_const+l)
 
             res.append([rho*l, rho*dy, rho*h])
 
@@ -60,6 +57,7 @@ if(__name__ == "__main__"):
     angle_step = 11.5
     angle_laser = 100
     angle_camera = 60
+
     model = []
 
     files = os.listdir(argv[1])
