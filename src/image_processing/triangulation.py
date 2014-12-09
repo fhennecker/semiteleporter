@@ -56,6 +56,10 @@ def plot(points):
 
 
 if(__name__ == "__main__"):
+    camera_center = 52
+    angle_step = 11.5
+    angle_laser = 100
+    angle_camera = 60
     model = []
 
     files = os.listdir(argv[1])
@@ -70,8 +74,8 @@ if(__name__ == "__main__"):
         img = filterNoise(img)
         limit = linearRegression(massCenter(img))
         points = massCenter(img, limit)
-        points = triangulation(points, img.shape[1], img.shape[0], 53/tan(degToRad(100)), degToRad(100), degToRad(60))
-        model += rotate(points, (0,53), idx*degToRad(11.5))
+        points = triangulation(points, img.shape[1], img.shape[0], camera_center/tan(degToRad(angle_laser)), degToRad(angle_laser), degToRad(angle_camera))
+        model += rotate(points, (0,camera_center), idx*degToRad(angle_step))
 
         print("time : %.3f sec." %(time.time()-start))
 
