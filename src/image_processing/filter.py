@@ -48,7 +48,7 @@ def massCenter(img, limit=None, output=None):
         for side in range(len(parts)):
             moments = cv2.moments(parts[side])
             if(moments['m00'] != 0):
-                point = [moments['m01']/moments['m00']+x*side, y]
+                point = [round(moments['m01']/moments['m00']+x*side), y]
                 res[side].append(point)
                 if(output != None):
                     output[point[1]][point[0]] =  np.array([0,255,0], dtype=np.uint8)
