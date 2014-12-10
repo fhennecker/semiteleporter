@@ -1,0 +1,4 @@
+language: python
+python: "2.7"
+install: "pip install numpy opencv matplotlib pytest"
+script: "py.test src/image_processing/tests.py"
