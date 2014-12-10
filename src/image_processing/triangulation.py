@@ -3,6 +3,7 @@ import os
 from math import sin,cos,tan,pi
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from cv2 import imread
 
 from filter import*
 
@@ -68,7 +69,8 @@ if(__name__ == "__main__"):
         print("processing image %s & %s" %(files[idx], files[idx+1]))
         start = time.time()
 
-        img = substract(os.path.join(argv[1],files[idx]), os.path.join(argv[1],files[idx+1]))
+        images = [imread(os.path.join(argv[1], files[i+1])) for i in range(2)]
+        img = substract(*images)
         img = filterNoise(img)
         limit = linearRegression(massCenter(img))
         points = massCenter(img, limit)

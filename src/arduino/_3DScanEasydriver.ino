@@ -3,72 +3,96 @@
   This driver controls a easydriver
   H.P.
   Commands are :
-  0 : Diodes 1 & 2 OFF
-  1 : Diode 1 ON
-  2 : Diode 2 ON
-  3 : one step
-  4 : change direction (no step)
-  5 : 1024 steps for a test
-  9 : power off
+  r/R: light right laser
+  l/L: light left laser
+  t/T: turn
+  0: shut off both lasers
+  b/B: light both lasers
  */
-int dirPin = 2;
-int stepperPin = 3;
-int diode1 = 12;
-int diode2 = 13;
-int cmd=0;
-boolean dir = true;
+
+/* Pinout */
+static const int dirPin = 2;
+static const int stepPin = 3;
+static const int laserLeftPin = 12;
+static const int laserRightPin = 13;
+
+/* Delay, in microseconds, to ensure laser state totally changed (on/off time) */
+static const int lightDelay = 1;
+
+/* Delay, in microseconds, between each motor half step */
+static const int stepDelay = 200;
+
+/* Number of steps for a complete rotation */
+static const int totalSteps = 800;
+
+/* Change lasers state */
+void laser(bool left, bool right){
+  digitalWrite(laserLeftPin, left ? HIGH : LOW);
+  digitalWrite(laserRightPin, right ? HIGH : LOW);
+  delay(lightDelay);
+}
+
+/* Turn platform */
+int currentPos = 0;
+void turn(int n_steps=1){
+  for (; n_steps>0; n_steps--){
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(stepDelay);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(stepDelay);
+    currentPos++;
+  }
+  currentPos %= totalSteps;
+  Serial.print(currentPos);
+}
 
 void setup() {
- Serial.begin(9600);
- pinMode(dirPin, OUTPUT);
- digitalWrite(dirPin,dir);
- pinMode(stepperPin, OUTPUT);
- pinMode(diode1, OUTPUT);
- pinMode(diode2, OUTPUT);
+  Serial.begin(9600);
+  pinMode(dirPin, OUTPUT);
+  digitalWrite(dirPin, HIGH);
+  pinMode(stepPin, OUTPUT);
+  digitalWrite(stepPin, LOW);
+  pinMode(laserLeftPin, OUTPUT);
+  pinMode(laserRightPin, OUTPUT);
+  laser(false, false);
 }
 
+char cmd = 0;
+bool ok = true;
 void loop() {
-  if (Serial.available()>0)
-  { 
-    cmd=int(Serial.read())-48;
-  //cmd is an integer 0-9
-    Serial.println(cmd);
-  //feedback a trace of the command
-  switch(cmd){
-    case 9:
-    case 0:
-    // lasers OFF
-      digitalWrite(diode1, LOW);
-      digitalWrite(diode2, LOW);
-      break;
-    case 1:
-    // laser 1 ON
-      digitalWrite(diode1, HIGH);
-      break;
-    case 2:
-    // laser 2 ON
-      digitalWrite(diode2, HIGH);
-      break;      
-    case 4:
-    // change direction
-      dir=! dir;
-      digitalWrite(dirPin,dir);
-      break;
-     case 5:
-    // 1024 steps for a test
-      for (int i=0;i<1024;i++) {
-        step();
-        delay(10); }
-      break;
-    
-    default:
-      step();
-  }
-  }      
-}
+  if (Serial.available() > 0){
+    ok = true;
+    cmd = Serial.read();
+    switch (cmd) {
+      case '0':
+        laser(false, false);
+        break;
 
-void step() {
-  //implements a step within a 8 steps sequence (default)
-  digitalWrite(stepperPin,LOW);
-  digitalWrite(stepperPin,HIGH);
+      case 'b':
+      case 'B':
+        laser(true, true);
+        break;
+
+      case 'l':
+      case 'L':
+        laser(true, false);
+        break;
+      case 'r':
+      case 'R':
+        laser(false, true);
+        break;
+
+      case 't':
+      case 'T':
+        turn();
+        break;
+
+      /* Unknow command*/
+      default: 
+        ok = false;
+    }
+    /* Echo back if command suceeded */
+    if (ok) 
+      Serial.println(cmd);
+  }      
 }

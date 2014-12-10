@@ -1,26 +1,29 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import cv2
 from pylab import imread
 from math import sin, cos, tan, atan, asin, pi, hypot
 import json
 from filter import findPoints, filterNoise, substract
 from multiprocessing import Pool
+import traceback
 
 def deg2rad(x): return pi*float(x)/180
 def rad2deg(x): return 180*float(x)/pi
 
 # Mesures
-L = 532.0   # Distance de la camera au centre du plateau (mm)
-H_C = 390.0 # Hauteur de la camera (mm)
+R = 250.0   # Rayon du plateau
+L = 405.0   # Distance de la camera au centre du plateau (mm)
+H_C = 240.0 # Hauteur de la camera (mm)
 H_P = 185.0 # Hauteur du plateau (mm)
 
-GAMMA_D = -deg2rad(83) # Angle entre le laser gauche et le plan de l'image
-GAMMA_G = deg2rad(78)  # Angle entre le laser droit et le plan de l'image
-ALPHA = atan(280/L)    # Angle d'ouverture horizontal de la camera
+GAMMA_D = -atan(L/155) # Angle entre le laser gauche et le plan de l'image
+GAMMA_G = atan(L/155)  # Angle entre le laser droit et le plan de l'image
+ALPHA = deg2rad(60)    # Angle d'ouverture horizontal de la camera
 
 # Calibration: centre du plateau sur l'image (en pixels)
-CX, CY = 317, 310
+CX, CY = 943, 743
 
 # Deductions
 H_RELATIVE = H_C - H_P # Hauteur relative de la camera par rapport au plateau
@@ -67,7 +70,7 @@ def theta_phi(alpha, image_shape, position):
     return theta, phi
 
 
-def extract_points(with_lasers_path, without_lasers_path, angle):
+def extract_points(with_lasers_path, without_lasers_path, rotation, gamma):
     """
     Extrait les points en 3D d'une paire d'images (avec et sans lasers).
     On passe le chemin des images, et l'angle de rotation du plateau. 
@@ -75,30 +78,35 @@ def extract_points(with_lasers_path, without_lasers_path, angle):
     """
     res = []
     try:
-        image = filterNoise(substract(with_lasers_path, without_lasers_path))
-        H, W = image.shape[:2]
+        left, off = cv2.imread(with_lasers_path), cv2.imread(without_lasers_path)
+        H, W = left.shape[:2]
         # Matrice de rotation (x,y tournent autour du centre du plateau, z inchangé)
         ROTMATRIX = np.array([
-            [ cos(angle), sin(angle), 0], 
-            [-sin(angle), cos(angle), 0], 
+            [ cos(rotation), sin(rotation), 0], 
+            [-sin(rotation), cos(rotation), 0], 
             [          0,          0, 1]
         ])
-        for j, i in findPoints(image):
+        for j, i in findPoints(left, off):
             theta, phi = theta_phi(ALPHA, [W, H], [j, i])
-            if theta > 0:
-                continue
-            res.append(position(GAMMA_G, theta, phi).dot(ROTMATRIX))
+            pos = position(gamma, theta, phi).dot(ROTMATRIX)
+
+            # Ignore les points en dehors du plateau
+            if pos[0]*pos[0] + pos[1]*pos[1] < R*R:
+                res.append(pos)
         print "\033[32mDone with %s-%s\033[0m" % (with_lasers_path, without_lasers_path)
     except:
-        print "\033[31mError with %s-%s\033[0m" % (with_lasers_path, without_lasers_path)
+        print "\033[31mError with %s-%s" % (with_lasers_path, without_lasers_path)
+        traceback.print_exc()
+        print "\033[0m"
     return res
 
 
 def wrap_extract_points(args):
+    """"""
     return extract_points(*args)
 
 
-def build_3d(first_img_num=2, last_img_num=32, n_workers=4):
+def build_3d(first_img_num=0, last_img_num=32, n_workers=4):
     """
     Construit un modèle 3D a partir des images (hardcode pour le moment).
     Utilise n_workers threads pour faire les calculs en parallèle
@@ -106,9 +114,18 @@ def build_3d(first_img_num=2, last_img_num=32, n_workers=4):
     workers = Pool(processes=n_workers)
     workers_args = [
         (
-            "imgs/%02d.png"%(2*i), 
-            "imgs/%02d.png"%(2*i+1), 
-            i*pi/16
+            "../triangulation_4/imgs/%02d-left.png"%(i), 
+            "../triangulation_4/imgs/%02d-off.png"%(i), 
+            i*pi/16,
+            GAMMA_G
+        ) 
+    for i in range(first_img_num, last_img_num)]
+    workers_args += [
+        (
+            "../triangulation_4/imgs/%02d-right.png"%(i), 
+            "../triangulation_4/imgs/%02d-off.png"%(i), 
+            i*pi/16,
+            GAMMA_D
         ) 
     for i in range(first_img_num, last_img_num)]
 

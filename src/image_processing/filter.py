@@ -2,32 +2,35 @@ from sys import argv
 import cv2
 import numpy as np
 
+RedMask = np.array([[[0, 0, 1]]])
 
-def substract(sub_path, base_path):
-    # this method substract base from sub
-    res = np.array(cv2.imread(sub_path), dtype=np.int16)
-    base = cv2.imread(base_path)
+def substract(image_with_lasers, image_without_lasers):
+    """
+    Substract the image without lasers from the one with lasers.
+    @param image_with_lasers A (heigh, width, 3) shaped NumPy array
+    @param image_without_lasers A (heigh, width, 3) shaped NumPy array
+    """
+    assert image_with_lasers.shape == image_without_lasers.shape
+    assert len(image_with_lasers.shape) == 3
+    assert image_with_lasers.shape[2] == 3
+    global RedMask
 
-    mask = np.array((res.shape[0],res.shape[1],res.shape[2]))
-    mask[:] = [0,0,1]
-    res *= mask
-
-    res -= base
-    res = res.clip(0)
-
-    return np.array(res, dtype=np.uint8)
-
-
+    if RedMask.shape != image_with_lasers.shape:
+        RedMask = np.array(image_with_lasers.shape, dtype=np.int16)
+        RedMask[:] = [0, 0, 1]
+    res = np.array(image_with_lasers*RedMask - image_without_lasers*RedMask, dtype=np.int16)
+    return np.array(res.clip(0), dtype=np.uint8)
 
 def filterNoise(img):
-    # this method apply a filter to delete alone pixels
+    """Apply filters to remove lonesome points"""
     img = cv2.GaussianBlur(img,(5,5),0)
     ret, img = cv2.threshold(img, 35, 255, cv2.THRESH_TOZERO)
     return img
 
-
 def massCenter(img, limit=None, output=None):
-    # this method search the mass center of the red color by line in each area delimited by limit
+    """
+    Search mass center of the red color by line in each area delimited by limit
+    """
     height,x,y = 0,0,0
     parts = []
     res = [[],[]]
@@ -50,40 +53,48 @@ def massCenter(img, limit=None, output=None):
             if(moments['m00'] != 0):
                 point = [round(moments['m01']/moments['m00']+x*side), y]
                 res[side].append(point)
-                if(output != None):
-                    output[point[1]][point[0]] =  np.array([0,255,0], dtype=np.uint8)
+                if (output != None):
+                    output[point[1]][point[0]] = np.array([0,255,0], dtype=np.uint8)
 
-    if(limit == None):
-        return res[0]
-    else:
-        return res
-
+    return res[0]+res[1]
 
 def linearRegression(points, output=None):
-    # this method make a linear regression with all points
+    """
+    Apply linear regression on all points
+    """
     x,y = np.array(points).T
     param = np.linalg.lstsq(np.array([y, np.ones(y.shape)]).T, x)[0]
     line = np.array([param[0]*y+param[1],y]).T
 
-    if(output != None):
+    if output != None:
         for x,y in line:
             output[y][x] = np.array([255,0,0], dtype=np.uint8)
-
+    
     return line
 
+def display(img, title, wait=True):
+    """Show results (demo)"""
+    cv2.imshow(title, cv2.resize(img, (640, 360), interpolation=cv2.INTER_AREA))
+    if wait:
+        cv2.waitKey(0)
 
-
-def display(img, title):
-    # this method display result (for demo)
-    cv2.imshow(title, img)
-    cv2.waitKey(0)
-
+def findPoints(_with, without):
+    img = filterNoise(substract(_with, without))
+    points = massCenter(img, None, img)
+    points = linearRegression(points, img)
+    return massCenter(img, points, img)
 
 if(__name__ == "__main__"):
-    img = substract(argv[1], argv[2])
+    import matplotlib.pyplot as plt
+    wi, wo = cv2.imread(argv[1]), cv2.imread(argv[2])
+
+    display(wi, "Avec lasers")
+    display(wo, "Sans lasers")
+
+    img = substract(wi, wo)
     display(img, "Substraction result")
 
-    img = filterNoise(img);
+    img = filterNoise(img)
     display(img, "soft filter to delete noise")
 
     points = massCenter(img, None, img)
@@ -92,6 +103,12 @@ if(__name__ == "__main__"):
     points = linearRegression(points, img)
     display(img, "linear regression result")
 
-    res = np.zeros(img.shape, dtype=np.uint8)
-    massCenter(img, points, res)
-    display(res,"Second mass center step to fit lasers")
+    wi *= 0.25
+    points = massCenter(img, points, wi)
+    display(wi,"Second mass center step to fit lasers", True)
+
+    X, Y = map(np.array,  zip(*points))
+    plt.scatter(X, -Y)
+    plt.xlim(0, 1920)
+    plt.ylim(-1080, 0)
+    plt.show() 
