@@ -4,6 +4,13 @@ import numpy as np
 
 RedMask = np.array([[[0, 0, 1]]])
 
+
+def calibrationMask(img_with, img_without):
+    res = substract(img_with, img_without)
+    res = filterNoise(res)
+    return (res-1)/255
+    
+
 def substract(image_with_lasers, image_without_lasers):
     """
     Substract the image without lasers from the one with lasers.
@@ -15,16 +22,18 @@ def substract(image_with_lasers, image_without_lasers):
     assert image_with_lasers.shape[2] == 3
     global RedMask
 
-    if RedMask.shape != image_with_lasers.shape:
+    if(RedMask.shape != image_with_lasers.shape):
         RedMask = np.array(image_with_lasers.shape, dtype=np.int16)
         RedMask[:] = [0, 0, 1]
+        #RedMask = np.zeros(image_with_lasers.shape, dtype=np.int16)
+        #RedMask[270:800,730:1120] = [0, 0, 1]
     res = np.array(image_with_lasers*RedMask - image_without_lasers*RedMask, dtype=np.int16)
     return np.array(res.clip(0), dtype=np.uint8)
 
 def filterNoise(img):
     """Apply filters to remove lonesome points"""
     img = cv2.GaussianBlur(img,(5,5),0)
-    ret, img = cv2.threshold(img, 35, 255, cv2.THRESH_TOZERO)
+    ret, img = cv2.threshold(img, 27, 255, cv2.THRESH_TOZERO)
     return img
 
 def massCenter(img, limit=None, output=None):
@@ -72,11 +81,10 @@ def linearRegression(points, output=None):
     
     return line
 
-def display(img, title, wait=True):
+def display(img, title):
     """Show results (demo)"""
     cv2.imshow(title, cv2.resize(img, (640, 360), interpolation=cv2.INTER_AREA))
-    if wait:
-        cv2.waitKey(0)
+    cv2.waitKey(0)
 
 def findPoints(_with, without):
     img = filterNoise(substract(_with, without))
@@ -100,12 +108,12 @@ if(__name__ == "__main__"):
     points = massCenter(img, None, img)
     display(img,"First mass center step")
 
-    points = linearRegression(points, img)
-    display(img, "linear regression result")
+    #points = linearRegression(points, img)
+    #display(img, "linear regression result")
 
-    wi *= 0.25
-    points = massCenter(img, points, wi)
-    display(wi,"Second mass center step to fit lasers", True)
+    #wi *= 0.25
+    #points = massCenter(img, points, wi)
+    #display(wi,"Second mass center step to fit lasers")
 
     X, Y = map(np.array,  zip(*points))
     plt.scatter(X, -Y)
