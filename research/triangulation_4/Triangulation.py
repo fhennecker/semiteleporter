@@ -8,6 +8,7 @@ import json
 from filter import findPoints, filterNoise, substract
 from multiprocessing import Pool
 import traceback
+from ObjConverter import ObjConverter
 
 def deg2rad(x): return pi*float(x)/180
 def rad2deg(x): return 180*float(x)/pi
@@ -29,6 +30,9 @@ CX, CY = 943, 743
 H_RELATIVE = H_C - H_P # Hauteur relative de la camera par rapport au plateau
 DELTA = asin(H_RELATIVE/L) # Angle de plongée de la caméra
 CAM = np.array([0, -L, H_RELATIVE]) # Position de la camera
+
+# .obj file controller
+OBJ_CONVERTER = ObjConverter("points")
 
 
 def position(gamma, theta, phi):
@@ -149,6 +153,8 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     XYZ = build_3d(n_workers=8)
+
+    OBJ_CONVERTER.write(XYZ)
 
     fig = plt.figure()
     R = 250

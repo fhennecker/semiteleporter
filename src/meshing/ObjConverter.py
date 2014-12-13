@@ -1,11 +1,23 @@
-def toObjFile(values, filename):
-	""" Converts a list of [X, Y, Z] lists to filename.obj """
-	f = open(filename+".obj", 'w')
-	for value in values:
-		toWrite = "v " # vertex keyword in .obj
-		toWrite += "%f %f %f\n" % (value[0], value[1], value[2])
-		toWrite += "p -1\n" # point on the previous vertex defined
-		f.write(toWrite)
-	f.close()
+class ObjConverter:
+	def __init__(self, filename):
+		self.filename = filename
+		self.f = open(filename+".obj", 'a')
 
-toObjFile([[0,0,0],[1,1,1],[2,2,2], [0,0,1], [0,1,0], [1, 0,0]], "bonjour")
+	def write(self, values):
+		""" Converts a list of [X, Y, Z] lists to file """
+		self.f.close()
+		self.f = open(self.filename+".obj", 'w')
+		for value in values:
+			toWrite = "v " # vertex keyword in .obj
+			toWrite += "%f %f %f\n" % (value[0], value[1], value[2])
+			self.f.write(toWrite)
+		self.f.close()
+		self.f = open(self.filename+".obj", 'a')
+
+	def append(self, x, y, z):
+		""" Appends point x, y, z to file """
+		self.f.write("v %f %f %f\n" % (x, y, z))
+
+if __name__ == "__main__":
+	oc = ObjConverter("bonjour")
+	oc.write([[0,0,0],[1,1,1],[2,2,2], [0,0,1], [0,1,0], [1, 0,0]])
