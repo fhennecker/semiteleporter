@@ -16,14 +16,19 @@ static const int stepPin = 3;
 static const int laserLeftPin = 12;
 static const int laserRightPin = 13;
 
-/* Delay, in microseconds, to ensure laser state totally changed (on/off time) */
+/* Delay, in milliseconds, to ensure laser state totally changed (on/off time) */
 static const int lightDelay = 1;
 
 /* Delay, in microseconds, between each motor half step */
-static const int stepDelay = 200;
+static const int stepDelayMax = 2000;
+static const int stepDelayMin = 500;
+static int stepDelay = 2000;
+
+/* Delay, in milliseconds to wait after motor turn (plate stabilization) */
+static const int afterTurnDelay = 100;
 
 /* Number of steps for a complete rotation */
-static const int totalSteps = 800;
+static const int totalSteps = 8000;
 
 /* Change lasers state */
 void laser(bool left, bool right){
@@ -34,14 +39,23 @@ void laser(bool left, bool right){
 
 /* Turn platform */
 int currentPos = 0;
-void turn(int n_steps=1){
+void turn(int n_steps=100){
+  int half = n_steps/2;
+  int increment = (stepDelayMax - stepDelayMin) / half;
+  stepDelay = stepDelayMax;
+
   for (; n_steps>0; n_steps--){
     digitalWrite(stepPin, HIGH);
     delayMicroseconds(stepDelay);
     digitalWrite(stepPin, LOW);
     delayMicroseconds(stepDelay);
     currentPos++;
+    if (n_steps > half)
+      stepDelay -= increment;
+    else
+      stepDelay += increment;
   }
+  delay(afterTurnDelay);
   currentPos %= totalSteps;
   Serial.print(currentPos);
 }

@@ -88,9 +88,7 @@ def display(img, title):
 
 def findPoints(_with, without):
     img = filterNoise(substract(_with, without))
-    points = massCenter(img, None, img)
-    points = linearRegression(points, img)
-    return massCenter(img, points, img)
+    return massCenter(img)
 
 if(__name__ == "__main__"):
     import matplotlib.pyplot as plt
