@@ -3,9 +3,9 @@ def toObjFile(values, filename):
 	f = open(filename+".obj", 'w')
 	for value in values:
 		toWrite = "v " # vertex keyword in .obj
-		toWrite += "%f %f %f" % (value[0], value[1], value[2])
-		f.write(toWrite+"\n")
+		toWrite += "%f %f %f\n" % (value[0], value[1], value[2])
+		toWrite += "p -1\n" # point on the previous vertex defined
+		f.write(toWrite)
 	f.close()
 
-
-toObjFile([[1.111, 2.222, 3.333], [4.444, 5.555, 6.666], [7.777, 8.888, 9.999]], "bonjour")
+toObjFile([[0,0,0],[1,1,1],[2,2,2], [0,0,1], [0,1,0], [1, 0,0]], "bonjour")
