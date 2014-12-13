@@ -5,14 +5,13 @@ import cv2
 from math import sin, cos, tan, atan, asin, pi, hypot
 import json
 from filter import findPoints
-from multiprocessing import Pool
 from douglaspeucker import reduce_pointset
 import traceback
 
 def deg2rad(x): return pi*float(x)/180
 def rad2deg(x): return 180*float(x)/pi
 
-def triangulation(L, H, CX, CY, gamma, imageW=1920, imageH=1080):
+def triangulation(L, H, CX, CY, GAMMA, imageW=1920, imageH=1080):
     # Mesures
     R = 250.0              # Rayon du plateau
     ALPHA = deg2rad(72)    # Angle d'ouverture horizontal de la camera
@@ -20,12 +19,12 @@ def triangulation(L, H, CX, CY, gamma, imageW=1920, imageH=1080):
     # Deductions
     DELTA = asin(H/L) # Angle de plongée de la caméra
     CAM = np.array([0, -L, H]) # Position de la camera
-    LASER = np.array([L * tan(pi/2 - gamma), 0, 0]) #Vecteur directeur du laser
+    LASER = np.array([L * tan(pi/2 - GAMMA), 0, 0]) #Vecteur directeur du laser
     ASPECT = imageW/imageH # Aspect de l'image
     BETA = 0.5 * ALPHA / ASPECT  # Angle d'ouverture vertical de la camera
 
-    # Precalcul de cos(gamma) et sin(gamma)
-    cosG, sinG = cos(gamma), sin(gamma)
+    # Precalcul de cos(GAMMA) et sin(GAMMA)
+    cosG, sinG = cos(GAMMA), sin(GAMMA)
 
     def position(theta, phi):
         # vecteur directeur du rayon sortant de la camera
@@ -46,6 +45,7 @@ def triangulation(L, H, CX, CY, gamma, imageW=1920, imageH=1080):
 
     def extract_points(rotation, points):
         res = []
+        rotation *= -1
         # Matrice de rotation (x,y tournent autour du centre du plateau, z inchangé)
         ROTMATRIX = np.array([
             [ cos(rotation), sin(rotation), 0], 
