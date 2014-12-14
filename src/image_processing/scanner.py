@@ -4,6 +4,7 @@ from serial import Serial
 from math import pi
 from time import sleep
 from filter import calibrationMask
+from glob import glob
 
 class Scanner:
     """
@@ -15,10 +16,28 @@ class Scanner:
     class CaptureError(Exception):
         pass
 
+    @classmethod
+    def list_arduinos_candidates(klass):
+        """Return a list of all possible connected arduinos"""
+        return sum(
+            map(glob, [
+                "/dev/ttyACM*", 
+                "/dev/ttyUSB*", 
+                "/dev/tty.usbmodem*"
+            ]), [])
+
+    @classmethod
+    def list_cameras_indexes(klass):
+        """Return currently connected cameras indexes (V4L2)"""
+        return [int(x.replace('/dev/video', '')) for x in glob("/dev/video*")]
+
     def __init__(self, arduino_dev="/dev/ttyACM0", cam_id=0):
         self.arduino_dev = arduino_dev
         self.cam_id = cam_id
         self.W, self.H = 1920, 1080
+
+    def aspect(self):
+        return float(self.W)/self.H
 
     def command_arduino(self, cmd):
         """
@@ -107,3 +126,4 @@ class Scanner:
             self.mask = calibrationMask(img_with, img_without)
             if dump_to_dir is not None:
                 cv2.imwrite(os.path.join(dump_to_dir, "calibration.png"), self.mask)
+        return self.mask
