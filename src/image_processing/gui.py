@@ -1,6 +1,7 @@
 import Tkinter as tk
 import cv2
 import numpy as np
+import tkMessageBox, tkFileDialog
 from PIL import Image, ImageTk
 from scanner import Scanner
 
@@ -45,8 +46,8 @@ class ButtonBar(tk.Frame):
         vertical_separator(self, w).pack()
 
     def build_action_buttons(self, w, h):
-        tk.Button(self, text="Calibration", command=self.app.calibrate).pack()
         tk.Button(self, text="Scan", command=self.app.scan).pack()
+        tk.Button(self, text="Open dump", command=self.app.open).pack()
         vertical_separator(self, w).pack()
 
 class ImageZone(tk.Frame):
@@ -55,7 +56,7 @@ class ImageZone(tk.Frame):
         self.app = app
         self.W, self.H = width, height
         self.imglabel = tk.Label(self)
-        self.show_image(255*np.ones((height, width, 3), dtype=np.uint8))
+        self.show_image(0x33*np.ones((height, width, 3), dtype=np.uint8))
         self.imglabel.pack()
         self.imglabel.bind('<Button-1>', self.clicked)
 
@@ -63,7 +64,7 @@ class ImageZone(tk.Frame):
         self.app.Cx.set(float(event.x)/self.W)
         self.app.Cy.set(float(event.y)/self.H)
         self.show_cross()
-        print self.app.Cx.get(), self.app.Cy.get()
+        self.app.calibrated.set(True)
 
     def show_image(self, image):
         if tuple(image.shape[:2]) != (self.H, self.W):
@@ -110,24 +111,55 @@ class App(tk.Tk):
         self.scanner = scanner
         self.bind('<Control-q>', lambda ev: self.quit())
         self.bind('<Control-w>', lambda ev: self.quit())
+
+        # Configuration variables
         self.arduino = tk.StringVar(self)
         self.arduino.set(scanner.arduino_dev)
         self.camera = tk.StringVar(self)
         self.camera.set(str(scanner.cam_id))
         self.frame = MainFrame(self)
+        
+        # Calibration
         self.Cx = tk.DoubleVar(self)
         self.Cx.set(0.5)
         self.Cy = tk.DoubleVar(self)
         self.Cy.set(0.5)
-
-    def calibrate(self):
-        self.scanner.arduino_dev = self.arduino.get()
-        self.scanner.cam_id = int(self.camera.get())
-        mask = self.scanner.calibrate()
-        self.frame.imgzone.show_image((255*mask).clip(0, 255))
+        self.calibrated = tk.BooleanVar(self)
+        self.calibrated.set(False)
 
     def scan(self):
-        print "Scan !"
+        if not self.calibrated.get():
+            tkMessageBox.showinfo(
+                "Calibration", 
+                "The scanner is not calibrated yet. It will now take a sample "+
+                "picture to determine initial lasers position. The image will "+
+                "be displayed in the window. Please click on the image, in "+
+                "order to align the red cross with the center of the yellow "+
+                "cross, then click on \"Scan\" again."
+            )
+            self.scanner.arduino_dev = self.arduino.get()
+            self.scanner.cam_id = int(self.camera.get())
+            mask = self.scanner.calibrate()
+            self.frame.imgzone.show_image((255*mask))
+            self.scan_iter = self.scanner.scan()
+        else:
+            print "Scan", self.scan_iter
+
+    def open(self):
+        self.calibrated.set(False)
+        from_dir = tkFileDialog.askdirectory(mustexist=True)
+        mask = self.scanner.calibrate_from(from_dir)
+        if mask is None:
+            tkMessageBox.showerror("File error", "Unable to open dump dir")
+        else:
+            self.frame.imgzone.show_image((255*mask))
+            tkMessageBox.showinfo(
+                "Calibration", 
+                "The image set is not calibrated yet. Please click on the image in "+
+                "order to align the red cross on the center of the yellow cross. "+
+                "Then, click on \"Scan\" to continue."
+            )
+            self.scan_iter = self.scanner.replay(from_dir)
 
 if __name__ == "__main__":
     gui = App(Scanner())

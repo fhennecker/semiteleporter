@@ -113,7 +113,7 @@ class Scanner:
         - Il is the image with left laser
         - Ir is the image with right laser
         """
-        self.mask = cv2.imread(os.path.join(from_dir, "calibration.png"))
+        self.calibrate_from(from_dir)
         for i in range(n_angles):
             off   = cv2.imread(self.photo_filename(from_dir, i, 'off'))
             left  = cv2.imread(self.photo_filename(from_dir, i, 'left'))
@@ -122,6 +122,10 @@ class Scanner:
             left  *= self.mask
             right *= self.mask
             yield angle, off, left, right
+
+    def calibrate_from(self, from_dir):
+        self.mask = cv2.imread(os.path.join(from_dir, "calibration.png"))
+        return self.mask
 
     def calibrate(self, dump_to_dir=None):
         with Serial(self.arduino_dev, 9600) as self.arduino:
