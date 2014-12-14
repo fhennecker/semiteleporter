@@ -5,6 +5,7 @@ from titriangulation import triangulation
 from douglaspeucker import reduce_pointset
 from math import atan, pi, hypot
 import argparse
+import json
 
 def img2points(angle, *args):
     """Convert a pair of images to detected laser points"""
@@ -23,8 +24,9 @@ def plot3D(**points_series):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d', aspect="equal")
     for color, points in points_series.iteritems():
-        X, Y, Z = zip(*points)
-        ax.scatter(X, Y, Z, color=color)
+        if len(points) > 0:
+            X, Y, Z = zip(*points)
+            ax.scatter(X, Y, Z, color=color, alpha=0.25)
 
     R = 250
     disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
@@ -62,7 +64,6 @@ def main(OPTIONS):
         raw_input("Calibration finie. Placez l'objet, puis enter")
     
     left_points, right_points = [], []
-    all_points = []
     with left_pipe, right_pipe:
         img_count = 0
         for angle, off, left, right in imgsrc:
@@ -80,6 +81,9 @@ def main(OPTIONS):
                 right_points += right_pipe.retire()
             print "Images %d done" % (i+1)
 
+    all_points = left_points + right_points
+    if OPTIONS.json:
+        json.dump(map(list, all_points), open(OPTIONS.json, 'w'))
     print "Have %d points" % (len(all_points))
     plot3D(b=left_points, r=right_points)
 
@@ -142,6 +146,11 @@ if __name__ == '__main__':
         '-n', '--n-frames', type=int,
         action='store', dest='n_frames', default=80,
         help="Number of frames to take (will only take the n firsts on 80"
+    )
+    optparser.add_argument(
+        '-j', '--json', type=str,
+        action='store', dest='json', default=None,
+        help="Output points as a json list to this file"
     )
     main(optparser.parse_args())
 
