@@ -11,18 +11,22 @@ CV_CAP_PROP_FRAME_COUNT = 7
 
 
 with Serial("/dev/ttyACM0", 9600) as arduino:
+    sleep(3)
+
     def command(cmd):
         start = time()
         arduino.write(cmd)
         while arduino.read(1) != cmd:
             pass
-        print "TEMPS:", time()-start
+
+    def wrap_photo(args):
+        return photo(*args)
 
     def photo(command_before, name=None):
         if name:
             print name
         command(command_before)
-        capture = cv2.VideoCapture(0)
+        capture = cv2.VideoCapture(1)
         capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920)
         capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080)
         ok, img = capture.read()
@@ -34,13 +38,14 @@ with Serial("/dev/ttyACM0", 9600) as arduino:
         return img
 
     def triphoto():
-        return map(photo, [('l', 'Left laser'), ('0', 'No laser'), ('r', 'Right laser')])
+        command('t')
+        return map(wrap_photo, [('l', 'Left laser'), ('0', 'No laser'), ('r', 'Right laser')])
 
-    i = 0
-    while True:
-        raw_input("Photo ? ")
+    for i in range(80):
         off, left, right = triphoto()
-        cv2.imwrite("imgs/%02d-off.png" % (i), off)
+        print "photo %d" % (i)
         cv2.imwrite("imgs/%02d-left.png" % (i), left)
+        cv2.imwrite("imgs/%02d-off.png" % (i), off)
         cv2.imwrite("imgs/%02d-right.png" % (i), right)
-        i += 1
+
+print "=== SCAN COMPLETED ! ==="

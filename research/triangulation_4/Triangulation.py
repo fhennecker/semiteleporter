@@ -69,16 +69,6 @@ def theta_phi(alpha, image_shape, position):
     phi = (CY - y)/(h/2) * beta
     return theta, phi
 
-
-def reduce_pointset(points, thres=0.1):
-    """
-    Apply Douglas-Peucker algorithm on a laser plane defined point set to 
-    reduce the number of points
-    """
-    # On ordonne les points verticalement
-    points.sort(key=lambda x: x[2])
-    return points
-
 def extract_points(with_lasers_path, without_lasers_path, rotation, gamma):
     """
     Extrait les points en 3D d'une paire d'images (avec et sans lasers).
@@ -101,64 +91,73 @@ def extract_points(with_lasers_path, without_lasers_path, rotation, gamma):
 
             x, y, z = pos
             # Ignore les points en dehors du plateau
-            if z > 0 and x*x + y*y < R*R:
+            if z > 0 and hypot(x, y) < R:
                 res.append(pos)
-        print "\033[32mDone with %s-%s\033[0m" % (with_lasers_path, without_lasers_path)
+        before = len(res)
+        res = reduce_pointset(res, thres=0.1)
+        after = len(res)
+        print "\033[32mDone with %s-%s\033[0m %d -> %d points" % (with_lasers_path, without_lasers_path, before, after)
     except:
         print "\033[31mError with %s-%s" % (with_lasers_path, without_lasers_path)
         traceback.print_exc()
         print "\033[0m"
-    return reduce_pointset(res)
-
+    return res
 
 def wrap_extract_points(args):
-    """"""
+    """Unpack arguments for extract_points"""
     return extract_points(*args)
 
-
-def build_3d(first_img_num=0, last_img_num=32, n_workers=8):
+def build_3d(first_img_num=0, last_img_num=32, n_workers=8, base_path="imgs"):
     """
     Construit un modèle 3D a partir des images (hardcode pour le moment).
     Utilise n_workers threads pour faire les calculs en parallèle
     """
     workers = Pool(processes=n_workers)
-    workers_args = [
-        (
-            "imgs/%02d-left.png"%(i), 
-            "imgs/%02d-off.png"%(i), 
-            i*pi/16,
-            GAMMA_G
-        ) 
-    for i in range(first_img_num, last_img_num)]
+    workers_args = []
+    # workers_args = [
+    #     (
+    #         "%s/%02d-left.png"%(base_path, i), 
+    #         "%s/%02d-off.png"%(base_path, i), 
+    #         -2*i*pi/(last_img_num-first_img_num),
+    #         GAMMA_G
+    #     ) 
+    # for i in range(first_img_num, last_img_num)]
     workers_args += [
         (
-            "imgs/%02d-right.png"%(i), 
-            "imgs/%02d-off.png"%(i), 
-            i*pi/16,
+            "%s/%02d-right.png"%(base_path, i), 
+            "%s/%02d-off.png"%(base_path, i), 
+            -2*i*pi/(last_img_num-first_img_num),
             GAMMA_D
         ) 
     for i in range(first_img_num, last_img_num)]
 
-    # Unpack des arguments pour extract_points
     XYZ = sum(workers.map(wrap_extract_points, workers_args), [])
     return XYZ
 
+def draw_plot(XYZ):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d', aspect="equal")
+    X, Y, Z = zip(*XYZ)
+    ax.scatter(X, Y, Z, '.', s=2)
+
+    disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
+    diskX, diskY, diskZ = zip(*disk)
+    ax.plot(diskX, diskY, diskZ, '.', color='g', alpha=0.25)
+
+    ax.set_xlim(-R, R)
+    ax.set_ylim(-R, R)
+    ax.set_zlim(-R, R)
+    plt.show()
 
 # ## Et oui, on aime les graphiques !
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
-    XYZ = build_3d(n_workers=8)
+    from sys import argv
 
-    fig = plt.figure()
-    R = 250
-    disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
-    ax = fig.add_subplot(111, projection='3d', aspect="equal")
-    X, Y, Z = zip(*XYZ)
-    ax.scatter(X, Y, Z, '.', s=2)
-    diskX, diskY, diskZ = zip(*disk)
-    ax.plot(diskX, diskY, diskZ, '.', color='g', alpha=0.25)
-    ax.set_xlim(-R, R)
-    ax.set_ylim(-R, R)
-    ax.set_zlim(-R, R)
-    plt.show()
+    base_path = argv[1] if len(argv) > 1 else "../../camtest/imgs"
+    XYZ = build_3d(last_img_num=32, n_workers=8, base_path=base_path)
+    json.dump(map(list, XYZ), open("telephone.json", "w"))
+    print "%d points" % (len(XYZ))
+    draw_plot(XYZ)
+    

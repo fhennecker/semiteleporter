@@ -41,7 +41,7 @@ def plot3D(**points_series):
 def main(OPTIONS):
     print "RUNNING PROGRAM WITH OPTIONS", OPTIONS
     GAMMA_G = atan(OPTIONS.L/155)  # Angle entre le laser gauche et le plan de l'image
-    GAMMA_D = -atan(OPTIONS.L/155) # Angle entre le laser droit et le plan de l'image
+    GAMMA_D = -atan(OPTIONS.L/175) # Angle entre le laser droit et le plan de l'image
     left_pipe = Pipeline(
         img2points,
         triangulation(OPTIONS.L, 55.0, OPTIONS.cx, OPTIONS.cy, GAMMA_G),
