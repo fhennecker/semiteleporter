@@ -24,8 +24,10 @@ class ObjConverter:
 		self.write(loads(open(filename, 'r').read()))
 
 if __name__ == "__main__":
-	oc = ObjConverter("bonjour")
-	oc.write([[0,0,0],[1,1,1],[2,2,2], [0,0,1], [0,1,0], [1, 0,0]])
-	oc2 = ObjConverter("reducted_phone")
-	oc2.writeFromJson("reducted_phone.json")
+	from sys import argv
+	for filename in argv[1:]:
+		name = filename.replace('.json', '')
+		oc2 = ObjConverter(name)
+		oc2.writeFromJson(filename)
+		print "Converted", name
 

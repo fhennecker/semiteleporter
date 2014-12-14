@@ -1,3 +1,7 @@
+"""
+Main script for the 3D scanner
+"""
+
 from pipeline import Pipeline
 from scanner import Scanner
 from filter import findPoints
@@ -6,6 +10,7 @@ from douglaspeucker import reduce_pointset
 from math import atan, pi, hypot
 import argparse
 import json
+import sys
 
 def img2points(angle, *args):
     """Convert a pair of images to detected laser points"""
@@ -38,8 +43,14 @@ def plot3D(**points_series):
     ax.set_zlim(-R, R)
     plt.show()
 
-def main(OPTIONS):
-    print "RUNNING PROGRAM WITH OPTIONS", OPTIONS
+def main(OPTIONS, prompt=raw_input):
+    """
+    Main glue function. Return an iterator on (progress, text), where
+    - progress is a float between 0 and 1 indicating global reconstruction progress
+    - text is the description of the current phase
+    The parameter prompt is a function that prompts for user input (takes a
+    text as param, return user input)
+    """
     GAMMA_G = atan(OPTIONS.L/155)  # Angle entre le laser gauche et le plan de l'image
     GAMMA_D = -atan(OPTIONS.L/175) # Angle entre le laser droit et le plan de l'image
     left_pipe = Pipeline(
@@ -59,9 +70,9 @@ def main(OPTIONS):
     imgsrc = scanner.replay(OPTIONS.dump_dir, OPTIONS.n_frames) if OPTIONS.dump_dir else scanner.scan(OPTIONS.dest_dir, OPTIONS.n_frames)
 
     if not OPTIONS.dump_dir:
-        raw_input("Calibration. Assurez vous que le plateau est vide, puis enter")
+        prompt("Calibration. Assurez vous que le plateau est vide")
         scanner.calibrate(OPTIONS.dest_dir)
-        raw_input("Calibration finie. Placez l'objet, puis enter")
+        prompt("Calibration finie. Placez l'objet")
     
     left_points, right_points = [], []
     with left_pipe, right_pipe:
@@ -71,7 +82,7 @@ def main(OPTIONS):
                 left_pipe.feed(angle, left, off)
             if not OPTIONS.left_only:
                 right_pipe.feed(angle, right, off)
-            print "Acquired images at %d deg" % (180*angle/pi)
+            yield angle/(4*pi), "Image acquisition"
             img_count += 1
 
         for i in range(img_count):
@@ -79,78 +90,92 @@ def main(OPTIONS):
                 left_points += left_pipe.retire()
             if not OPTIONS.left_only:
                 right_points += right_pipe.retire()
-            print "Images %d done" % (i+1)
+            yield 0.5 + angle/(4*pi), "Image Rendering"
 
     all_points = left_points + right_points
     if OPTIONS.json:
         json.dump(map(list, all_points), open(OPTIONS.json, 'w'))
-    print "Have %d points" % (len(all_points))
-    plot3D(b=left_points, r=right_points)
+    yield 1, "Have %d points" % (len(all_points))
+    if OPTIONS.show_scene:
+        plot3D(b=left_points, r=right_points)
 
+optparser = argparse.ArgumentParser(
+    description="The 3D scanner main program"
+)
+optparser.add_argument(
+    '-p', '--port', type=str,
+    action='store', dest='serial_port', default="/dev/ttyACM0",
+    help="Serial port for arduino"
+)
+optparser.add_argument(
+    '-c', '--camera-index', type=int,
+    action='store', dest='cam_index', default=0,
+    help="Camera index (Video4Linux)"
+)
+optparser.add_argument(
+    '-D', '--use-dump', type=str,
+    action='store', dest='dump_dir', default=None,
+    help="Use dumped images instead of camera"
+)
+optparser.add_argument(
+    '-d', '--dump', type=str,
+    action='store', dest='dest_dir', default=None,
+    help="Dump camera images to this directory"
+)
+optparser.add_argument(
+    '-l', '--left-only',
+    action='store_true', dest='left_only', default=False,
+    help="Use only left laser"
+)
+optparser.add_argument(
+    '-r', '--right-only',
+    action='store_true', dest='right_only', default=False,
+    help="Use only right laser"
+)
+optparser.add_argument(
+    '-t', '--threshold', type=float,
+    action='store', dest='reduce_thres', default=1,
+    help="Threshold for point reduction algorithm"
+)
+optparser.add_argument(
+    '-X', '--center-x', type=int,
+    action='store', dest='cx', default=960,
+    help="Center of plate on the captured image, in pixels"
+)
+optparser.add_argument(
+    '-Y', '--center-y', type=int,
+    action='store', dest='cy', default=540,
+    help="Center of plate on the captured image, in pixels"
+)
+optparser.add_argument(
+    '-L', '--length', type=float,
+    action='store', dest='L', default=375,
+    help="Distance in mm from the center of the plate to the camera"
+)
+optparser.add_argument(
+    '-n', '--n-frames', type=int,
+    action='store', dest='n_frames', default=80,
+    help="Number of frames to take (will only take the n firsts on 80)"
+)
+optparser.add_argument(
+    '-j', '--json', type=str,
+    action='store', dest='json', default=None,
+    help="Output points as a json list to this file"
+)
+optparser.add_argument(
+    '-H', '--hide',
+    action='store_false', dest='show_scene', default=True,
+    help="Do not show resulting pointcloud with Matplotlib"
+)
 
 if __name__ == '__main__':
-    optparser = argparse.ArgumentParser(
-        description="The 3D scanner main program"
-    )
-    optparser.add_argument(
-        '-p', '--port', type=str,
-        action='store', dest='serial_port', default="/dev/ttyACM0",
-        help="Serial port for arduino"
-    )
-    optparser.add_argument(
-        '-c', '--camera-index', type=int,
-        action='store', dest='cam_index', default=0,
-        help="Camera index (Video4Linux)"
-    )
-    optparser.add_argument(
-        '-D', '--use-dump', type=str,
-        action='store', dest='dump_dir', default=None,
-        help="Use dumped images instead of camera"
-    )
-    optparser.add_argument(
-        '-d', '--dump', type=str,
-        action='store', dest='dest_dir', default=None,
-        help="Dump camera images to this directory"
-    )
-    optparser.add_argument(
-        '-l', '--left-only',
-        action='store_true', dest='left_only', default=False,
-        help="Use only left laser"
-    )
-    optparser.add_argument(
-        '-r', '--right-only',
-        action='store_true', dest='right_only', default=False,
-        help="Use only right laser"
-    )
-    optparser.add_argument(
-        '-t', '--threshold', type=float,
-        action='store', dest='reduce_thres', default=1,
-        help="Threshold for point reduction algorithm"
-    )
-    optparser.add_argument(
-        '-X', '--center-x', type=int,
-        action='store', dest='cx', default=960,
-        help="Center of plate on the captured image, in pixels"
-    )
-    optparser.add_argument(
-        '-Y', '--center-y', type=int,
-        action='store', dest='cy', default=540,
-        help="Center of plate on the captured image, in pixels"
-    )
-    optparser.add_argument(
-        '-L', '--length', type=float,
-        action='store', dest='L', default=375,
-        help="Distance in mm from the center of the plate to the camera"
-    )
-    optparser.add_argument(
-        '-n', '--n-frames', type=int,
-        action='store', dest='n_frames', default=80,
-        help="Number of frames to take (will only take the n firsts on 80"
-    )
-    optparser.add_argument(
-        '-j', '--json', type=str,
-        action='store', dest='json', default=None,
-        help="Output points as a json list to this file"
-    )
-    main(optparser.parse_args())
+    def progress_bar(progress, width=25):
+        n = int(round(width*progress))
+        return "\033[43m%s\033[0;33m%s %d%%\033[0m" % (n*' ', (width-n)*'-', 100*progress)
+
+    for progress, text in main(optparser.parse_args()):
+        text = "\r%s %s" % (progress_bar(progress), text)
+        sys.stdout.write(text.rjust(80))
+        sys.stdout.flush()
+    print
 
