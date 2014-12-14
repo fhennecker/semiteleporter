@@ -4,6 +4,14 @@ import numpy as np
 import tkMessageBox, tkFileDialog
 from PIL import Image, ImageTk
 from scanner import Scanner
+from renderer import RenderParams, Renderer
+from math import hypot
+
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 def vertical_separator(parent, width):
     return tk.Frame(parent, height=3, width=width, bd=1, relief=tk.SUNKEN)
@@ -85,6 +93,23 @@ class ImageZone(tk.Frame):
         self.imgtk = ImageTk.PhotoImage(image=Image.fromarray(layers))
         self.imglabel.configure(image=self.imgtk)
 
+    def show_3D(self, points):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d', aspect="equal")
+        X, Y, Z = zip(*points)
+        ax.scatter(X, Y, Z, alpha=0.25)
+        R = 250
+        disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
+        diskX, diskY, diskZ = zip(*disk)
+        ax.plot(diskX, diskY, diskZ, '.', color='g', alpha=0.25)
+        ax.set_xlim(-R, R)
+        ax.set_ylim(-R, R)
+        ax.set_zlim(-R, R)
+        canvas = FigureCanvasTkAgg(fig, master=self)
+        canvas.show()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+
 class InfoBar(tk.Frame):
     def __init__(self, parent, app, **kwargs):
         tk.Frame.__init__(self, parent, **kwargs)
@@ -127,8 +152,21 @@ class App(tk.Tk):
         self.calibrated = tk.BooleanVar(self)
         self.calibrated.set(False)
 
+    def do_scan(self):
+        params = RenderParams(
+            CX=self.Cx.get()*self.scanner.W,
+            CY=self.Cy.get()*self.scanner.H
+        )
+        all_points = []
+        for points in Renderer(params, self.scan_iter):
+            print points
+            all_points += points[0]
+        self.frame.imgzone.show_3D(all_points)
+
     def scan(self):
-        if not self.calibrated.get():
+        if self.calibrated.get():
+            self.do_scan()
+        else:
             tkMessageBox.showinfo(
                 "Calibration", 
                 "The scanner is not calibrated yet. It will now take a sample "+
@@ -142,8 +180,7 @@ class App(tk.Tk):
             mask = self.scanner.calibrate()
             self.frame.imgzone.show_image((255*mask))
             self.scan_iter = self.scanner.scan()
-        else:
-            print "Scan", self.scan_iter
+            
 
     def open(self):
         self.calibrated.set(False)
