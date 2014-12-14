@@ -2,5 +2,7 @@ language: python
 python: "2.7"
 install: 
   - "sudo apt-get install python-opencv"
-  - "pip install numpy matplotlib pytest"
-script: "py.test src/image_processing/*.py"
+  - "pip install numpy matplotlib pytest ino"
+script: 
+  - "py.test src/image_processing/*.py"
+  - "cd arduino && ino build"

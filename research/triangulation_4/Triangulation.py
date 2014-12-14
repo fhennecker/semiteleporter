@@ -4,10 +4,12 @@ import numpy as np
 import cv2
 from pylab import imread
 from math import sin, cos, tan, atan, asin, pi, hypot
+from douglaspeucker import reduce_pointset
 import json
 from filter import findPoints, filterNoise, substract
 from multiprocessing import Pool
 import traceback
+from ObjConverter import ObjConverter
 
 def deg2rad(x): return pi*float(x)/180
 def rad2deg(x): return 180*float(x)/pi
@@ -29,6 +31,9 @@ CX, CY = 943, 743
 H_RELATIVE = H_C - H_P # Hauteur relative de la camera par rapport au plateau
 DELTA = asin(H_RELATIVE/L) # Angle de plongée de la caméra
 CAM = np.array([0, -L, H_RELATIVE]) # Position de la camera
+
+# .obj file controller
+OBJ_CONVERTER = ObjConverter("points")
 
 
 def position(gamma, theta, phi):
@@ -149,14 +154,16 @@ def draw_plot(XYZ):
     ax.set_zlim(-R, R)
     plt.show()
 
-# ## Et oui, on aime les graphiques !
+
+# Et oui, on aime les graphiques !
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     from sys import argv
 
-    base_path = argv[1] if len(argv) > 1 else "../../camtest/imgs"
+    base_path = argv[1] if len(argv) > 1 else "imgs"
     XYZ = build_3d(last_img_num=32, n_workers=8, base_path=base_path)
+    OBJ_CONVERTER.write(XYZ)
     json.dump(map(list, XYZ), open("telephone.json", "w"))
     print "%d points" % (len(XYZ))
     draw_plot(XYZ)
