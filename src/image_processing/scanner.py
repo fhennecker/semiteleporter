@@ -16,6 +16,9 @@ class Scanner:
     class CaptureError(Exception):
         pass
 
+    class NoCalibrationError(Exception):
+        pass
+
     @classmethod
     def list_arduinos_candidates(klass):
         """Return a list of all possible connected arduinos"""
@@ -78,6 +81,10 @@ class Scanner:
         If dump_to_dir is a non-empty string, save copy of taken images to this
         directory.
         """
+        try:
+            self.mask
+        except:
+            raise self.NoCalibrationError()
         with Serial(self.arduino_dev, 9600) as self.arduino:
             self.wait_arduino_boot() # Wait arduino boot
             self.command_arduino('0') # Shut off lasers

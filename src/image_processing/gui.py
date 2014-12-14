@@ -52,15 +52,36 @@ class ButtonBar(tk.Frame):
 class ImageZone(tk.Frame):
     def __init__(self, parent, app, width, height, **kwargs):
         tk.Frame.__init__(self, parent, width=width, height=height, **kwargs)
+        self.app = app
         self.W, self.H = width, height
         self.imglabel = tk.Label(self)
-        self.show_image(255*np.ones((height, width)))
+        self.show_image(255*np.ones((height, width, 3), dtype=np.uint8))
         self.imglabel.pack()
+        self.imglabel.bind('<Button-1>', self.clicked)
+
+    def clicked(self, event):
+        self.app.Cx.set(float(event.x)/self.W)
+        self.app.Cy.set(float(event.y)/self.H)
+        self.show_cross()
+        print self.app.Cx.get(), self.app.Cy.get()
 
     def show_image(self, image):
         if tuple(image.shape[:2]) != (self.H, self.W):
             image = cv2.resize(image, (self.W, self.H), interpolation=cv2.INTER_AREA)
-        self.imgtk = ImageTk.PhotoImage(image=Image.fromarray(image))
+        self.image = image
+        self.imgtk = ImageTk.PhotoImage(image=Image.fromarray(self.image))
+        self.imglabel.configure(image=self.imgtk)
+
+    def show_cross(self):
+        self.overlay = np.zeros(self.image.shape)
+        x = self.W * self.app.Cx.get()
+        y = self.H * self.app.Cy.get()
+        for i in range(self.W):
+            self.overlay[y][i] = np.array([255, -255, -255])
+        for i in range(self.H):
+            self.overlay[i][x] = np.array([255, -255, -255])
+        layers = np.array((self.image + self.overlay).clip(0, 255), dtype=np.uint8)
+        self.imgtk = ImageTk.PhotoImage(image=Image.fromarray(layers))
         self.imglabel.configure(image=self.imgtk)
 
 class InfoBar(tk.Frame):
@@ -94,6 +115,10 @@ class App(tk.Tk):
         self.camera = tk.StringVar(self)
         self.camera.set(str(scanner.cam_id))
         self.frame = MainFrame(self)
+        self.Cx = tk.DoubleVar(self)
+        self.Cx.set(0.5)
+        self.Cy = tk.DoubleVar(self)
+        self.Cy.set(0.5)
 
     def calibrate(self):
         self.scanner.arduino_dev = self.arduino.get()
