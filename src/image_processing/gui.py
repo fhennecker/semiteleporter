@@ -175,6 +175,9 @@ class InfoBar(tk.Frame):
                 tk.Entry(frame, textvariable=var).pack(side="left")
             frame.pack()
 
+        tk.Label(self, text="Minimum significant line deviation").pack(side="left")
+        tk.Scale(self, from_=0, to=5, variable=app.THRES, resolution=0.1, orient=tk.HORIZONTAL).pack(side="left")
+
 class MainFrame(tk.Frame):
     def __init__(self, app, **kwargs):
         iH = 500 # Image height
@@ -213,6 +216,7 @@ class App(tk.Tk):
         self.H = DoubleVar(self, 55)
         self.LASER_L = DoubleVar(self, -155)
         self.LASER_R = DoubleVar(self, 155)
+        self.THRES = DoubleVar(self, 1)
 
         # Build GUI
         self.frame = MainFrame(self)
@@ -225,7 +229,8 @@ class App(tk.Tk):
             H=self.H.get(),
             L=self.L.get(),
             LASER_L=self.LASER_L.get(),
-            LASER_R=self.LASER_R.get()
+            LASER_R=self.LASER_R.get(),
+            THRES=self.THRES.get()
         )
         all_points = []
         for points in Renderer(params, self.scan_iter):
