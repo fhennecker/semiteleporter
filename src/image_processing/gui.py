@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import Tkinter as tk
 import cv2
 import numpy as np
@@ -87,7 +89,6 @@ class ImageZone(tk.Frame):
         self.app = app
         self.W, self.H = width, height
         self.fig = plt.figure()
-        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
         # Add to canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -95,6 +96,8 @@ class ImageZone(tk.Frame):
         self.canvas.get_tk_widget().pack()
         self.show_image(0x33*np.ones((height, width, 3), dtype=np.uint8))
         self.canvas.mpl_connect('button_press_event', self)
+        app.Cx.trace('w', self.update_cross)
+        app.Cy.trace('w', self.update_cross)
 
     def __call__(self, event):
         x, y = event.xdata, event.ydata
@@ -112,6 +115,7 @@ class ImageZone(tk.Frame):
             image = cv2.resize(image, (self.W, self.H), interpolation=cv2.INTER_AREA)
         self.image = image
         ax = self.fig.add_subplot(111)
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         ax.axis('off')
         ax.imshow(self.image)
         self.canvas.draw()
@@ -125,6 +129,10 @@ class ImageZone(tk.Frame):
         ax.plot([0, self.W], [y, y], 'r', zorder=2)
         self.canvas.draw()
 
+    def update_cross(self, *args):
+        if self.mode == self.Mode2D:
+            self.show_cross()
+
     def add_3D_points(self, points):
         assert self.mode == self.Mode3D
 
@@ -134,6 +142,7 @@ class ImageZone(tk.Frame):
 
         # Draw points
         ax = self.fig.add_subplot(111, projection='3d', aspect="equal")
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         X, Y, Z = zip(*points)
         ax.scatter(X, Y, Z, alpha=0.25)
 
@@ -144,9 +153,8 @@ class ImageZone(tk.Frame):
         ax.plot(diskX, diskY, diskZ, '.', color='g', alpha=0.25)
         ax.set_xlim(-R, R)
         ax.set_ylim(-R, R)
-        ax.set_zlim(-R, R)
+        ax.set_zlim(0, 2*R)
         self.canvas.draw()
-        return ax
 
 class InfoBar(tk.Frame):
     def __init__(self, parent, app, **kwargs):
@@ -221,7 +229,7 @@ class App(tk.Tk):
         for points in Renderer(params, self.scan_iter):
             all_points += points[0]
             self.infotext.set("Have %d points..." % len(points))
-            print self.frame.imgzone.show_3D(all_points)
+            ax = self.frame.imgzone.show_3D(all_points)
         self.infotext.set(self.DESCRIPTION)
 
     def scan(self):

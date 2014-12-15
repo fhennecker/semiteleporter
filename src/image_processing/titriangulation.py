@@ -58,7 +58,7 @@ def triangulation(L, H, CX, CY, GAMMA, imageW=1920, imageH=1080):
 
             x, y, z = pos
             # Ignore les points en dehors du plateau
-            if hypot(x, y) < R:
+            if hypot(x, y) < R and z > 0:
                 res.append(pos)
         return res
 
