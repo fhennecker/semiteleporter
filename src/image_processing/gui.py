@@ -135,8 +135,13 @@ class ImageZone(tk.Frame):
         if self.mode == self.Mode2D:
             self.show_cross()
 
-    def add_3D_points(self, points):
+    def add_3D_points(self, ax, points):
         assert self.mode == self.Mode3D
+        if len(points) > 0:
+            X, Y, Z = zip(*points)
+            ax.scatter(X, Y, Z, alpha=0.25)
+            self.canvas.draw()
+        return ax
 
     def show_3D(self, points):
         self.fig.clear()
@@ -145,8 +150,6 @@ class ImageZone(tk.Frame):
         # Draw points
         ax = self.fig.add_subplot(111, projection='3d', aspect="equal")
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        X, Y, Z = zip(*points)
-        ax.scatter(X, Y, Z, alpha=0.25)
 
         # Draw plate in green
         R = 250
@@ -156,7 +159,8 @@ class ImageZone(tk.Frame):
         ax.set_xlim(-R, R)
         ax.set_ylim(-R, R)
         ax.set_zlim(0, 2*R)
-        self.canvas.draw()
+        self.add_3D_points(ax, points)
+        return ax
 
 class InfoBar(tk.Frame):
     def __init__(self, parent, app, **kwargs):
@@ -233,10 +237,11 @@ class App(tk.Tk):
             THRES=self.THRES.get()
         )
         all_points = []
+        ax = self.frame.imgzone.show_3D(all_points)
         for points in Renderer(params, self.scan_iter):
             all_points += points[0]
             self.infotext.set("Have %d points..." % len(points))
-            ax = self.frame.imgzone.show_3D(all_points)
+            self.frame.imgzone.add_3D_points(ax, points[0])
         self.infotext.set(self.DESCRIPTION)
 
     def scan_dump(self):
