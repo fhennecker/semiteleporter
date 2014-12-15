@@ -49,7 +49,7 @@ def reduce_pointset(points, thres=1):
     Apply Douglas-Peucker algorithm on a laser point set to 
     reduce the number of points
     """
-    if len(points) <= 2:
+    if len(points) <= 2 or thres <= 0:
         return points
     # On ordonne les points verticalement
     points.sort(key=lambda x: x[2])
