@@ -7,11 +7,11 @@ import multiprocessing
 import Queue
 
 class RenderParams(object):
-    def __init__(self, L=350, H=55, LASER_L_X=-155, LASER_R_X=155, CX=960, CY=540, THRES=1):
+    def __init__(self, L=350, H=55, LASER_L=-155, LASER_R=155, CX=960, CY=540, THRES=1):
         self.L = float(L)
         self.H = float(H)
-        self.GAMMA_L = atan(LASER_L_X/self.L)
-        self.GAMMA_R = atan(LASER_R_X/self.L)
+        self.GAMMA_L =  atan(self.L/abs(LASER_L))
+        self.GAMMA_R = -atan(self.L/abs(LASER_R))
         self.CX = int(CX)
         self.CY = int(CY)
         self.THRES = float(THRES)

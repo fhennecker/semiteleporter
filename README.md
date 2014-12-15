@@ -11,9 +11,12 @@ Package name for Debian (Ubuntu, Mint, ...) in brackets
 * Python 2.7 
 * numpy 
 * opencv
-* matplotlib
+* matplotlib with support for TkAgg
 * TKinter with support for images from PIL
 
 ### Install
 
-`sudo apt-get install python python-dev python-numpy python-opencv python-matplotlib python-imaging-tk`
+    sudo apt-get update
+    sudo apt-get install tk-dev libpng-dev libffi-dev dvipng texlive-latex-base python-tk python-dev python-imaging-tk python-pip
+    sudo pip install numpy matplotlib pyopencv
+
