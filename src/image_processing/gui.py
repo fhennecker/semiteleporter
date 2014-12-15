@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 from scanner import Scanner
 from renderer import RenderParams, Renderer
 from math import hypot
+from os import path
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -74,6 +75,7 @@ class ButtonBar(tk.Frame):
 
     def build_action_buttons(self, w, h):
         tk.Button(self, text="Scan", command=self.app.scan).pack()
+        tk.Button(self, text="Scan & Dump", command=self.app.scan_dump).pack()
         tk.Button(self, text="Open dump", command=self.app.open).pack()
         vertical_separator(self, w).pack()
 
@@ -232,7 +234,15 @@ class App(tk.Tk):
             ax = self.frame.imgzone.show_3D(all_points)
         self.infotext.set(self.DESCRIPTION)
 
-    def scan(self):
+    def scan_dump(self):
+        to_dir = None
+        if not self.is_calibrated.get():
+            to_dir = tkFileDialog.askdirectory(mustexist=True)
+            if not path.exists(to_dir):
+                return
+        return self.scan(to_dir)
+
+    def scan(self, to_dir=None):
         if self.is_calibrated.get():
             self.do_scan()
         else:
@@ -249,7 +259,7 @@ class App(tk.Tk):
             self.scanner.cam_id = int(self.camera.get())
             mask = self.scanner.calibrate()
             self.frame.imgzone.show_image((255*mask))
-            self.scan_iter = self.scanner.scan()
+            self.scan_iter = self.scanner.scan(to_dir)
             self.infotext.set(self.DESCRIPTION)
 
     def open(self):
