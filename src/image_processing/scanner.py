@@ -70,7 +70,7 @@ class Scanner:
     def wait_arduino_boot(self):
         sleep(3)
 
-    def scan(self, dump_to_dir=None):
+    def scan(self, dump_to_dir=None, n_angles=80):
         """
         Return an iterator on (A, Io, Il, Ir), where
         - A is the current angle
@@ -88,7 +88,7 @@ class Scanner:
         with Serial(self.arduino_dev, 9600) as self.arduino:
             self.wait_arduino_boot() # Wait arduino boot
             self.command_arduino('0') # Shut off lasers
-            for i in range(80):
+            for i in range(n_angles):
                 off = self.photo()
                 self.command_arduino('l') # Left laser on
                 left = self.photo()

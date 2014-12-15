@@ -2,7 +2,7 @@
 Main script for the 3D scanner
 """
 
-from pipeline import Pipeline
+from renderer import Renderer, RenderParams
 from scanner import Scanner
 from filter import findPoints
 from titriangulation import triangulation
@@ -31,7 +31,7 @@ def plot3D(**points_series):
     for color, points in points_series.iteritems():
         if len(points) > 0:
             X, Y, Z = zip(*points)
-            ax.scatter(X, Y, Z, color=color, alpha=0.25)
+            ax.plot(X, Y, Z, '.', color=color, alpha=0.25)
 
     R = 250
     disk = [(x, y, 0) for x in np.linspace(-R, R) for y in np.linspace(-R, R) if hypot(x, y) <= R]
@@ -51,19 +51,8 @@ def main(OPTIONS, prompt=raw_input):
     The parameter prompt is a function that prompts for user input (takes a
     text as param, return user input)
     """
-    GAMMA_G = atan(OPTIONS.L/155)  # Angle entre le laser gauche et le plan de l'image
-    GAMMA_D = -atan(OPTIONS.L/175) # Angle entre le laser droit et le plan de l'image
-    left_pipe = Pipeline(
-        img2points,
-        triangulation(OPTIONS.L, 55.0, OPTIONS.cx, OPTIONS.cy, GAMMA_G),
-        curried_reduce_pointset(OPTIONS.reduce_thres)
-    )
-    right_pipe = Pipeline(
-        img2points,
-        triangulation(OPTIONS.L, 55.0, OPTIONS.cx, OPTIONS.cy, GAMMA_D),
-        curried_reduce_pointset(OPTIONS.reduce_thres)
-    )
-
+    LASER_LEFT = 155.0 # Decalage du laser gauche en mm
+    LASER_RIGHT  = 175.0 # Decalage du laser droit en mm
     OPTIONS.n_frames = min(OPTIONS.n_frames, 80)
 
     scanner = Scanner(arduino_dev=OPTIONS.serial_port, cam_id=OPTIONS.cam_index)
@@ -74,30 +63,25 @@ def main(OPTIONS, prompt=raw_input):
         scanner.calibrate(OPTIONS.dest_dir)
         prompt("Calibration finie. Placez l'objet")
     
-    left_points, right_points = [], []
-    with left_pipe, right_pipe:
-        img_count = 0
-        for angle, off, left, right in imgsrc:
-            if not OPTIONS.right_only:
-                left_pipe.feed(angle, left, off)
-            if not OPTIONS.left_only:
-                right_pipe.feed(angle, right, off)
-            yield angle/(4*pi), "Image acquisition"
-            img_count += 1
+    yield 0, "Start scanning"
+    params = RenderParams(
+        CX=OPTIONS.cx, CY=OPTIONS.cy, THRES=OPTIONS.reduce_thres,
+        L=OPTIONS.L, LASER_L=LASER_LEFT, LASER_R=LASER_RIGHT
+    )
 
-        for i in range(img_count):
-            if not OPTIONS.right_only:
-                left_points += left_pipe.retire()
-            if not OPTIONS.left_only:
-                right_points += right_pipe.retire()
-            yield 0.5 + angle/(4*pi), "Image Rendering"
+    i = 0
+    all_points = []
+    for points in Renderer(params, imgsrc):
+        all_points += points
+        progress = float(i)/(2*OPTIONS.n_frames)
+        yield progress, "Scanning (%d points)..." % (len(all_points))
+        i += 1
 
-    all_points = left_points + right_points
     if OPTIONS.json:
         json.dump(map(list, all_points), open(OPTIONS.json, 'w'))
     yield 1, "Have %d points" % (len(all_points))
     if OPTIONS.show_scene:
-        plot3D(b=left_points, r=right_points)
+        plot3D(black=all_points)
 
 optparser = argparse.ArgumentParser(
     description="The 3D scanner main program"
@@ -121,16 +105,6 @@ optparser.add_argument(
     '-d', '--dump', type=str,
     action='store', dest='dest_dir', default=None,
     help="Dump camera images to this directory"
-)
-optparser.add_argument(
-    '-l', '--left-only',
-    action='store_true', dest='left_only', default=False,
-    help="Use only left laser"
-)
-optparser.add_argument(
-    '-r', '--right-only',
-    action='store_true', dest='right_only', default=False,
-    help="Use only right laser"
 )
 optparser.add_argument(
     '-t', '--threshold', type=float,
