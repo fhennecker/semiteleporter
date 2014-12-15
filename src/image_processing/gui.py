@@ -239,9 +239,9 @@ class App(tk.Tk):
         all_points = []
         ax = self.frame.imgzone.show_3D(all_points)
         for points in Renderer(params, self.scan_iter):
-            all_points += points[0]
+            all_points += points
             self.infotext.set("Have %d points..." % len(points))
-            self.frame.imgzone.add_3D_points(ax, points[0])
+            self.frame.imgzone.add_3D_points(ax, points)
         self.infotext.set(self.DESCRIPTION)
 
     def scan_dump(self):

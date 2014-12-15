@@ -44,7 +44,7 @@ class Renderer(multiprocessing.Process):
                         waiting.remove(pipe)
                         break
                     else:
-                        yield retired
+                        yield retired[0]
                 except Queue.Empty:
                     pass
         self.left_pipe.terminate()
