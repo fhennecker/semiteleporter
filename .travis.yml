@@ -3,7 +3,7 @@ python: "2.7"
 install: 
   - "sudo apt-get update"
   - "sudo apt-get install libopencv-dev"
-  - "pip install pytest ino matplotlib numpy pyopencv"
+  - "pip install --allow-external pyopencv --allow-unverified pyopencv pytest ino matplotlib numpy pyopencv"
 script: 
   - "py.test src/image_processing/*.py"
   - "cd arduino && ino build"
