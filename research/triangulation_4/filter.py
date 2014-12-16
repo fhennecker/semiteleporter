@@ -88,27 +88,32 @@ def display(img, title):
 
 def findPoints(_with, without):
     img = filterNoise(substract(_with, without))
-    return massCenter(img)
+    points = massCenter(img, None, img)
+    points = linearRegression(points, img)
+    return massCenter(img, points, img)
 
 if(__name__ == "__main__"):
     import matplotlib.pyplot as plt
-    if len(argv) < 4:
-        print "USAGE: %s CALIBRATION LASER OFF" % (argv[0])
-        exit()
-    cal, wi, wo = map(cv2.imread, argv[1:4])
+    wi, wo = cv2.imread(argv[1]), cv2.imread(argv[2])
 
     display(wi, "Avec lasers")
     display(wo, "Sans lasers")
 
-    img = substract(wi*cal, wo)
+    img = substract(wi, wo)
     display(img, "Substraction result")
 
     img = filterNoise(img)
     display(img, "soft filter to delete noise")
 
-    wi *= 0.33
-    points = massCenter(img, None, wi)
-    display(wi, "First mass center step")
+    points = massCenter(img, None, img)
+    display(img,"First mass center step")
+
+    #points = linearRegression(points, img)
+    #display(img, "linear regression result")
+
+    #wi *= 0.25
+    #points = massCenter(img, points, wi)
+    #display(wi,"Second mass center step to fit lasers")
 
     X, Y = map(np.array,  zip(*points))
     plt.scatter(X, -Y)
