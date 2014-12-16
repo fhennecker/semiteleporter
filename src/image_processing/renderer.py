@@ -2,19 +2,42 @@ from pipeline import Pipeline, EndOfProcessing
 from douglaspeucker import reduce_pointset
 from titriangulation import triangulation
 from filter import findPoints
-from math import atan
+from math import atan, tan
 import multiprocessing
 import Queue
+import json
 
 class RenderParams(object):
-    def __init__(self, L=350, H=55, LASER_L=-155, LASER_R=155, CX=960, CY=540, THRES=1):
+    SAVED_ATTRS = ('L', 'H', 'GAMMA_L', 'GAMMA_R', 'CX', 'CY', 'THRES')
+
+    def __init__(self, L=350, H=55, LASER_L=-155, LASER_R=155, CX=960, CY=540, THRES=1, GAMMA_L=None, GAMMA_R=None):
         self.L = float(L)
         self.H = float(H)
-        self.GAMMA_L =  atan(self.L/abs(LASER_L))
-        self.GAMMA_R = -atan(self.L/abs(LASER_R))
+        self.GAMMA_L = float(GAMMA_L) if GAMMA_L is not None else atan(self.L/abs(LASER_L))
+        self.GAMMA_R = float(GAMMA_R) if GAMMA_R is not None else -atan(self.L/abs(LASER_R))
         self.CX = int(CX)
         self.CY = int(CY)
         self.THRES = float(THRES)
+
+    @property
+    def LASER_L(self):
+        return -abs(self.L * tan(self.GAMMA_L))
+
+    @property
+    def LASER_R(self):
+        return abs(self.L * tan(self.GAMMA_R))
+
+    def save(self, filename):
+        with open(filename, 'w') as outFile:
+            json.dump({
+                name: getattr(self, name) for name in self.SAVED_ATTRS
+            }, outFile)
+
+    @classmethod
+    def load(klass, filename):
+        with open(filename) as inFile:
+            data = json.load(inFile)
+            return klass(**data)
 
 class Renderer(multiprocessing.Process):
     def __init__(self, OPTIONS, scan_iterator):

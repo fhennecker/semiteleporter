@@ -105,6 +105,7 @@ class ImageZone(tk.Frame):
         app.Cy.trace('w', self.update_cross)
 
     def __call__(self, event):
+        """Callback for matplotlib events"""
         x, y = event.xdata, event.ydata
         if x is None or y is None or self.mode is self.Mode3D:
             return
@@ -152,6 +153,7 @@ class ImageZone(tk.Frame):
 
         # Draw points
         ax = self.fig.add_subplot(111, projection='3d', aspect="equal")
+        ax.axis('off')
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
         # Draw plate in green
@@ -187,6 +189,8 @@ class InfoBar(tk.Frame):
             row += 1
         tk.Label(frame, text="Minimum significant line deviation").grid(row=row, column=0)
         tk.Scale(frame, from_=0, to=5, variable=app.THRES, resolution=0.1, orient=tk.HORIZONTAL).grid(row=row, column=1)
+        tk.Button(frame, text="Save config", command=app.save_config).grid(row=row, column=2)
+        tk.Button(frame, text="Load config", command=app.load_config).grid(row=row, column=3)
         frame.pack()
 
 class MainFrame(tk.Frame):
@@ -233,6 +237,7 @@ class App(tk.Tk):
         # Build GUI
         self.frame = MainFrame(self)
 
+    @property
     def render_params(self):
         return RenderParams(
             CX=self.Cx.get()*self.scanner.W,
@@ -248,7 +253,7 @@ class App(tk.Tk):
         self.infotext.set("Scanning...")
         all_points = []
         ax = self.frame.imgzone.show_3D(all_points)
-        for points in Renderer(self.render_params(), self.scan_iter):
+        for points in Renderer(self.render_params, self.scan_iter):
             all_points += points
             self.infotext.set("Have %d points..." % len(all_points))
             self.frame.imgzone.add_3D_points(ax, points)
@@ -257,7 +262,7 @@ class App(tk.Tk):
     def scan_dump(self):
         to_dir = None
         if not self.is_calibrated.get():
-            to_dir = tkFileDialog.askdirectory(mustexist=True)
+            to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose destination")
             if not path.exists(to_dir):
                 return
         return self.scan(to_dir)
@@ -285,7 +290,7 @@ class App(tk.Tk):
     def open(self):
         self.infotext.set("Opening dump...")
         self.is_calibrated.set(False)
-        from_dir = tkFileDialog.askdirectory(mustexist=True)
+        from_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
         mask = self.scanner.calibrate_from(from_dir)
         if mask is None:
             tkMessageBox.showerror("File error", "Unable to open dump dir %s" % (from_dir))
@@ -299,6 +304,24 @@ class App(tk.Tk):
             )
             self.scan_iter = self.scanner.replay(from_dir)
         self.infotext.set("Need calibration")
+
+    def save_config(self):
+        filename = tkFileDialog.asksaveasfilename(defaultextension='.json', title="Save config")
+        if filename:
+            self.render_params.save(filename)
+
+    def load_config(self):
+        filename = tkFileDialog.askopenfilename(title="Load config")
+        if filename:
+            params = RenderParams.load(filename)
+            self.Cx.set(float(params.CX)/self.scanner.W)
+            self.Cy.set(float(params.CY)/self.scanner.H)
+            self.H.set(params.H)
+            self.L.set(params.L)
+            self.LASER_L.set(params.LASER_L)
+            self.LASER_R.set(params.LASER_R)
+            self.THRES.set(params.THRES)
+            self.is_calibrated.set(True)
 
 if __name__ == "__main__":
     gui = App(Scanner())
