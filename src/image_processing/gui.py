@@ -9,6 +9,7 @@ from scanner import Scanner
 from renderer import RenderParams, Renderer
 from math import hypot
 from os import path
+from ObjConverter import ObjConverter
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -79,6 +80,8 @@ class ButtonBar(tk.Frame):
         tk.Button(self, text="Scan", command=self.app.scan).pack()
         tk.Button(self, text="Scan & Dump", command=self.app.scan_dump).pack()
         tk.Button(self, text="Open dump", command=self.app.open).pack()
+        vertical_separator(self, w).pack()
+        tk.Button(self, text="Export .obj", command=self.app.export_obj).pack()
         vertical_separator(self, w).pack()
 
 class ImageZone(tk.Frame):
@@ -177,6 +180,8 @@ class InfoBar(tk.Frame):
         )
         tk.Frame.__init__(self, parent, **kwargs)
         tk.Label(self, textvariable=app.infotext).pack()
+        tk.Label(self, text="Calibrated:").pack(side="left")
+        tk.Label(self, textvariable=app.is_calibrated).pack(side="left")
 
         frame = tk.Frame(self)
         row = 0
@@ -189,8 +194,8 @@ class InfoBar(tk.Frame):
             row += 1
         tk.Label(frame, text="Minimum significant line deviation").grid(row=row, column=0)
         tk.Scale(frame, from_=0, to=5, variable=app.THRES, resolution=0.1, orient=tk.HORIZONTAL).grid(row=row, column=1)
-        tk.Button(frame, text="Save config", command=app.save_config).grid(row=row, column=2)
-        tk.Button(frame, text="Load config", command=app.load_config).grid(row=row, column=3)
+        tk.Button(frame, text="Save params", command=app.save_config).grid(row=row, column=2)
+        tk.Button(frame, text="Load params", command=app.load_config).grid(row=row, column=3)
         frame.pack()
 
 class MainFrame(tk.Frame):
@@ -234,6 +239,9 @@ class App(tk.Tk):
         self.LASER_R = DoubleVar(self, 155)
         self.THRES = DoubleVar(self, 1)
 
+        # Results
+        self.points = None
+
         # Build GUI
         self.frame = MainFrame(self)
 
@@ -258,6 +266,7 @@ class App(tk.Tk):
             self.infotext.set("Have %d points..." % len(all_points))
             self.frame.imgzone.add_3D_points(ax, points)
         self.infotext.set(self.DESCRIPTION)
+        self.points = all_points
 
     def scan_dump(self):
         to_dir = None
@@ -268,6 +277,7 @@ class App(tk.Tk):
         return self.scan(to_dir)
 
     def scan(self, to_dir=None):
+        self.points = None
         if self.is_calibrated.get():
             self.do_scan()
         else:
@@ -322,6 +332,18 @@ class App(tk.Tk):
             self.LASER_R.set(params.LASER_R)
             self.THRES.set(params.THRES)
             self.is_calibrated.set(True)
+
+    def export_obj(self):
+        if self.points is None:
+            tkMessageBox.showerror("No object", 
+                "No 3D object to export. "+
+                "You must first scan an object or replay a dump directory"
+            )
+        else:
+            filename = tkFileDialog.asksaveasfilename(title="Export .obj")
+            if filename:
+                converter = ObjConverter(filename)
+                converter.write(self.points)
 
 if __name__ == "__main__":
     gui = App(Scanner())
