@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+# Shortcuts
 def IntVar(master, value=0): 
     res = tk.IntVar(master)
     res.set(value)
@@ -40,6 +41,7 @@ def vertical_separator(parent, width):
     return tk.Frame(parent, height=3, width=width, bd=1, relief=tk.SUNKEN)
 
 class ButtonBar(tk.Frame):
+    """Action button bar on the left side"""
     def __init__(self, parent, app, width, height, **kwargs):
         tk.Frame.__init__(self, parent, **kwargs)
         self.app = app
@@ -80,6 +82,7 @@ class ButtonBar(tk.Frame):
         vertical_separator(self, w).pack()
 
 class ImageZone(tk.Frame):
+    """Main image zone"""
     class Mode2D:
         pass
 
@@ -139,7 +142,7 @@ class ImageZone(tk.Frame):
         assert self.mode == self.Mode3D
         if len(points) > 0:
             X, Y, Z = zip(*points)
-            ax.scatter(X, Y, Z, alpha=0.25)
+            ax.plot(X, Y, Z, '.', color='black', alpha=0.25)
             self.canvas.draw()
         return ax
 
@@ -163,6 +166,7 @@ class ImageZone(tk.Frame):
         return ax
 
 class InfoBar(tk.Frame):
+    """Information and parameters bar"""
     def __init__(self, parent, app, **kwargs):
         infos = (
             (("Cam lens <-> plate center (mm)", app.L), ("Relative cam height (mm)", app.H)), 
@@ -172,17 +176,21 @@ class InfoBar(tk.Frame):
         tk.Frame.__init__(self, parent, **kwargs)
         tk.Label(self, textvariable=app.infotext).pack()
 
+        frame = tk.Frame(self)
+        row = 0
         for line in infos:
-            frame = tk.Frame(self)
+            col = 0
             for name, var in line:
-                tk.Label(frame, text=name).pack(side="left")
-                tk.Entry(frame, textvariable=var).pack(side="left")
-            frame.pack()
-
-        tk.Label(self, text="Minimum significant line deviation").pack(side="left")
-        tk.Scale(self, from_=0, to=5, variable=app.THRES, resolution=0.1, orient=tk.HORIZONTAL).pack(side="left")
+                tk.Label(frame, text=name).grid(row=row, column=col)
+                tk.Entry(frame, textvariable=var).grid(row=row, column=col+1)
+                col += 2
+            row += 1
+        tk.Label(frame, text="Minimum significant line deviation").grid(row=row, column=0)
+        tk.Scale(frame, from_=0, to=5, variable=app.THRES, resolution=0.1, orient=tk.HORIZONTAL).grid(row=row, column=1)
+        frame.pack()
 
 class MainFrame(tk.Frame):
+    """Main GUI frame"""
     def __init__(self, app, **kwargs):
         iH = 500 # Image height
         iW = int(iH*app.scanner.aspect()) # Image width
@@ -225,9 +233,8 @@ class App(tk.Tk):
         # Build GUI
         self.frame = MainFrame(self)
 
-    def do_scan(self):
-        self.infotext.set("Scanning...")
-        params = RenderParams(
+    def render_params(self):
+        return RenderParams(
             CX=self.Cx.get()*self.scanner.W,
             CY=self.Cy.get()*self.scanner.H,
             H=self.H.get(),
@@ -236,11 +243,14 @@ class App(tk.Tk):
             LASER_R=self.LASER_R.get(),
             THRES=self.THRES.get()
         )
+
+    def do_scan(self):
+        self.infotext.set("Scanning...")
         all_points = []
         ax = self.frame.imgzone.show_3D(all_points)
-        for points in Renderer(params, self.scan_iter):
+        for points in Renderer(self.render_params(), self.scan_iter):
             all_points += points
-            self.infotext.set("Have %d points..." % len(points))
+            self.infotext.set("Have %d points..." % len(all_points))
             self.frame.imgzone.add_3D_points(ax, points)
         self.infotext.set(self.DESCRIPTION)
 
