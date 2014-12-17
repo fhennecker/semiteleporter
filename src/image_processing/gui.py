@@ -59,30 +59,35 @@ class ButtonBar(tk.Frame):
             self.camera_menu.option_add(str(option), str(option))
 
     def build_scanner_input_menus(self, w, h):
-        tk.Button(self, text="Detect", command=self.refresh_scanner_input_menus).pack()
-
         tk.Label(self, text="Arduino serial port").pack()
-        self.arduino = tk.StringVar(self)
-        self.arduino.set(self.app.scanner.arduino_dev)
         options = Scanner.list_arduinos_candidates()
-        self.arduino_menu = tk.OptionMenu(self, self.arduino, *options)
+        self.arduino_menu = tk.OptionMenu(self, self.app.arduino, *options)
         self.arduino_menu.pack()
         
         tk.Label(self, text="Camera number").pack()
-        self.camera = tk.StringVar(self)
-        self.camera.set(str(self.app.scanner.cam_id))
         options = Scanner.list_cameras_indexes()
-        self.camera_menu = tk.OptionMenu(self, self.camera, *options)
+        self.camera_menu = tk.OptionMenu(self, self.app.camera, *options)
         self.camera_menu.pack()
         
         vertical_separator(self, w).pack()
 
     def build_action_buttons(self, w, h):
-        tk.Button(self, text="Scan", command=self.app.scan).pack()
-        tk.Button(self, text="Scan & Dump", command=self.app.scan_dump).pack()
-        tk.Button(self, text="Open dump", command=self.app.open).pack()
+        tk.Label(self, text="Calibrate").pack()
+        tk.Button(self, text="From scanner", command=self.app.calibrate_from_scanner).pack()
+        tk.Button(self, text="From scanner to dump", command=self.app.calibrate_and_dump).pack()
+        tk.Button(self, text="From dump", command=self.app.calibrate_from_dump).pack()
+        tk.Button(self, text="Reset", command=self.app.reset_calibration).pack()
         vertical_separator(self, w).pack()
+
+        tk.Label(self, text="Scan").pack()
+        tk.Button(self, text="From scanner", command=self.app.scan_from_scanner).pack()
+        tk.Button(self, text="From scanner to dump", command=self.app.scan_and_dump).pack()
+        tk.Button(self, text="From dump", command=self.app.scan_from_dump).pack()
+        vertical_separator(self, w).pack()
+
         tk.Button(self, text="Export .obj", command=self.app.export_obj).pack()
+        tk.Button(self, text="Lasers on", command=self.app.scanner.lasers_on).pack()
+        tk.Button(self, text="Lasers off", command=self.app.scanner.lasers_off).pack()
         vertical_separator(self, w).pack()
 
 class ImageZone(tk.Frame):
@@ -102,11 +107,12 @@ class ImageZone(tk.Frame):
         # Add to canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.show()
-        self.canvas.get_tk_widget().pack()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH)
         self.show_image(0x33*np.ones((height, width, 3), dtype=np.uint8))
         self.canvas.mpl_connect('button_press_event', self)
         app.Cx.trace('w', self.update_cross)
         app.Cy.trace('w', self.update_cross)
+        app.is_calibrated.trace('w', self.update_cross)
 
     def __call__(self, event):
         """Callback for matplotlib events"""
@@ -135,9 +141,10 @@ class ImageZone(tk.Frame):
         x = self.W * self.app.Cx.get()
         y = self.H * self.app.Cy.get()
         ax = self.show_image(self.image)
-        ax.plot([x, x], [0, self.H], 'r', zorder=1)
-        ax.plot([0, self.W], [y, y], 'r', zorder=2)
-        self.canvas.draw()
+        if self.app.is_calibrated.get():
+            ax.plot([x, x], [1, self.H-1], 'r', zorder=1)
+            ax.plot([1, self.W-1], [y, y], 'r', zorder=2)
+            self.canvas.draw()
 
     def update_cross(self, *args):
         if self.mode == self.Mode2D:
@@ -175,7 +182,7 @@ class InfoBar(tk.Frame):
     """Information and parameters bar"""
     def __init__(self, parent, app, **kwargs):
         infos = (
-            (("Cam lens <-> plate center (mm)", app.L), ("Relative cam height (mm)", app.H)), 
+            (("Stand <-> plate center (mm)", app.L), ("Relative cam height (mm)", app.H)), 
             (("Center x (ratio)", app.Cx), ("Center y (ratio)", app.Cy)),
             (("Left laser relative x (mm)", app.LASER_L), ("Right laser relative x (mm)", app.LASER_R))
         )
@@ -220,6 +227,7 @@ class App(tk.Tk):
 
     def __init__(self, scanner):
         tk.Tk.__init__(self)
+        self.wm_title("Semiteleporter")
         self.scanner = scanner
         self.bind('<Control-q>', lambda ev: self.quit())
         self.bind('<Control-w>', lambda ev: self.quit())
@@ -258,65 +266,64 @@ class App(tk.Tk):
             THRES=self.THRES.get()
         )
 
-    def do_scan(self):
+    def reset_calibration(self):
+        self.is_calibrated.set(False)
+
+    def do_scan(self, scan_iter):
         self.infotext.set("Scanning...")
+        self.points = None
+
         all_points = []
         ax = self.frame.imgzone.show_3D(all_points)
-        for points in Renderer(self.render_params, self.scan_iter):
+        for points in Renderer(self.render_params, scan_iter):
             all_points += points
             self.infotext.set("Have %d points..." % len(all_points))
             self.frame.imgzone.add_3D_points(ax, points)
         self.infotext.set(self.DESCRIPTION)
         self.points = all_points
 
-    def scan_dump(self):
-        to_dir = None
+    def scan_from_dump(self):
         if not self.is_calibrated.get():
-            to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose destination")
-            if not path.exists(to_dir):
-                return
-        return self.scan(to_dir)
-
-    def scan(self, to_dir=None):
-        self.points = None
-        if self.is_calibrated.get():
-            self.do_scan()
+            tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
         else:
-            self.infotext.set("Acquiring calibration image...")
-            tkMessageBox.showinfo(
-                "Calibration", 
-                "The scanner is not calibrated yet. It will now take a sample "+
-                "picture to determine initial lasers position. The image will "+
-                "be displayed in the window. Please click on the image, in "+
-                "order to align the red cross with the center of the yellow "+
-                "cross, then click on \"Scan\" again."
-            )
+            from_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
+            self.do_scan(self.scanner.replay(from_dir))
+
+    def scan_from_scanner(self, to_dir=None):
+        if not self.is_calibrated.get():
+            tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
+        else:
             self.scanner.arduino_dev = self.arduino.get()
             self.scanner.cam_id = int(self.camera.get())
-            mask = self.scanner.calibrate()
-            self.Cx, self.Cy = findCenter(mask)
-            self.show_cross()
-            self.frame.imgzone.show_image((255*mask))
-            self.scan_iter = self.scanner.scan(to_dir)
-            self.infotext.set(self.DESCRIPTION)
+            self.do_scan(self.scanner.scan(to_dir))
 
-    def open(self):
-        self.infotext.set("Opening dump...")
-        self.is_calibrated.set(False)
+    def scan_and_dump(self):
+        if not self.is_calibrated.get():
+            tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
+        else:
+            to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose destination directory")
+            self.scan_from_scanner(to_dir)
+
+    def calibrate_from_scanner(self, to_dir=None):
+        self.infotext.set("Acquiring calibration image")
+        self.scanner.arduino_dev = self.arduino.get()
+        self.scanner.cam_id = int(self.camera.get())
+        mask = self.scanner.calibrate()
+        self.frame.imgzone.show_image(255*mask)
+        self.infotext.set(self.DESCRIPTION)
+
+    def calibrate_and_dump(self):
+        to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
+        if to_dir:
+            self.calibrate_from_scanner(to_dir)
+
+    def calibrate_from_dump(self):
         from_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
         mask = self.scanner.calibrate_from(from_dir)
         if mask is None:
             tkMessageBox.showerror("File error", "Unable to open dump dir %s" % (from_dir))
         else:
-            self.frame.imgzone.show_image((255*mask))
-            tkMessageBox.showinfo(
-                "Calibration", 
-                "The image set is not calibrated yet. Please click on the image in "+
-                "order to align the red cross on the center of the yellow cross. "+
-                "Then, click on \"Scan\" to continue."
-            )
-            self.scan_iter = self.scanner.replay(from_dir)
-        self.infotext.set("Need calibration")
+            self.frame.imgzone.show_image(255*mask)
 
     def save_config(self):
         filename = tkFileDialog.asksaveasfilename(defaultextension='.json', title="Save config")

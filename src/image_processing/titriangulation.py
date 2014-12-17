@@ -17,7 +17,7 @@ def triangulation(L, H, CX, CY, GAMMA, imageW=1920, imageH=1080):
     ALPHA = deg2rad(72)    # Angle d'ouverture horizontal de la camera
 
     # Deductions
-    DELTA = asin(H/L) # Angle de plongée de la caméra
+    DELTA = atan(H/L) # Angle de plongée de la caméra
     CAM = np.array([0, -L, H]) # Position de la camera
     LASER = np.array([L * tan(pi/2 - GAMMA), 0, 0]) #Vecteur directeur du laser
     ASPECT = imageW/imageH # Aspect de l'image

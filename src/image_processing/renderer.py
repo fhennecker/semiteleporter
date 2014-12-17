@@ -8,24 +8,24 @@ import Queue
 import json
 
 class RenderParams(object):
-    SAVED_ATTRS = ('L', 'H', 'GAMMA_L', 'GAMMA_R', 'CX', 'CY', 'THRES')
+    SAVED_ATTRS = ('L', 'H', 'LASER_L', 'LASER_R', 'CX', 'CY', 'THRES')
 
-    def __init__(self, L=350, H=55, LASER_L=-155, LASER_R=155, CX=960, CY=540, THRES=1, GAMMA_L=None, GAMMA_R=None):
+    def __init__(self, L=350, H=55, LASER_L=-155, LASER_R=155, CX=960, CY=540, THRES=1):
         self.L = float(L)
         self.H = float(H)
-        self.GAMMA_L = float(GAMMA_L) if GAMMA_L is not None else atan(self.L/abs(LASER_L))
-        self.GAMMA_R = float(GAMMA_R) if GAMMA_R is not None else -atan(self.L/abs(LASER_R))
+        self.LASER_L = LASER_L
+        self.LASER_R = LASER_R
         self.CX = int(CX)
         self.CY = int(CY)
         self.THRES = float(THRES)
 
     @property
-    def LASER_L(self):
-        return -abs(self.L * tan(self.GAMMA_L))
+    def GAMMA_L(self):
+        return atan(self.L/abs(self.LASER_L))
 
     @property
-    def LASER_R(self):
-        return abs(self.L * tan(self.GAMMA_R))
+    def GAMMA_R(self):
+        return -atan(self.L/abs(self.LASER_R))
 
     def save(self, filename):
         with open(filename, 'w') as outFile:
@@ -81,9 +81,16 @@ class Renderer(multiprocessing.Process):
         self.left_pipe.feed(EndOfProcessing)
         self.right_pipe.feed(EndOfProcessing)
 
-if __name__ == "__main__":
-    from scanner import Scanner
-    p = RenderParams(335, CX=972, CY=782)
-    for points in Renderer(p, Scanner().replay("GLOBE")):
-        print points
+def test_params_save_load():
+    params = RenderParams(LASER_L=-42, LASER_R=24)
+    params.save("/tmp/renderparams.json")
+    copy = RenderParams.load("/tmp/renderparams.json")
+    assert copy.LASER_L == -42
+    assert copy.LASER_R == 24
 
+if __name__ == "__main__":
+    # Collect tests if not using py.test
+    _ = locals()
+    is_a_test = lambda x: x.startswith('test_') and '__call__' in dir(_[x])
+    for test_name in filter(is_a_test, _.keys()):
+        _[test_name]()
