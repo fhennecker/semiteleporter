@@ -12,26 +12,26 @@ def calibrationMask(img_with, img_without):
     
 def findCenter(calib_img):
     height = calib_img.shape[0]
+    width = calib_img.shape[1]
     currentHeight = height-1
-    resX, resY = 0, 0
     centerLow, centerHigh = 0, 0 # the center usually is a few pixels high
 
-    while centerHigh == 0: # while the center high point is not found
-        moments = cv2.moments(np.array([pixel[2] for pixel in calib_img[currentHeight]], dtype=np.uint8))
-        center = moments['m01'] / moments['m00']
-        # if moment is on a 0 pixel of the calib image, we found the center
-        if centerLow == 0 : # searching for center low first
-            print center, currentHeight
-            if (center != 0 and calib_img[currentHeight][round(center)][2] == 0):
+    while centerHigh == 0:
+        clustersNumber = 0;
+        x = 1
+        while x < width:
+            if calib_img[currentHeight][x-1][2] == 0 and calib_img[currentHeight][x][2] == 1:
+                clustersNumber += 1
+            x+=1
+        if clustersNumber == 1:
+            if centerLow == 0 : # if still not found
                 centerLow = currentHeight
-        else: # searching for center high
-            if (center != 0 and calib_img[currentHeight][round(center)][2] == 1):
+        else:
+            if centerLow != 0 :
                 centerHigh = currentHeight
         currentHeight -= 1
-    resY = (centerLow + centerHigh) / 2 # arithmetic average
-    moments = cv2.moments(np.array([pixel[2] for pixel in calib_img[resY]], dtype=np.uint8))
-    resX = moments['m01'] / moments['m00']
-    return resX, resY
+
+    return centerLow, centerHigh
 
 def substract(image_with_lasers, image_without_lasers):
     """
@@ -139,15 +139,16 @@ if(__name__ == "__main__"):
     # plt.show() 
 
     import matplotlib.pyplot as plt
-    if len(argv) < 3:
-        print "USAGE: %s CALIBRATION_WITH CALIBRATION_WITHOUT" % (argv[0])
+    if len(argv) < 2:
+        print "USAGE: %s CALIBRATION" % (argv[0])
         exit()
-    wi, wo = map(cv2.imread, argv[1:3])
-    calib = calibrationMask(wi, wo)
+    calib = cv2.imread(argv[1])
     cx, cy = findCenter(calib)
     for i in range(len(calib[cx])):
         calib[cy][i] = np.array([0,255,0], dtype=np.uint8)
-    for j in range(len(calib)):
-        calib[j][cx] = np.array([0,255,0], dtype=np.uint8)
+    for i in range(len(calib[cx])):
+        calib[cx][i] = np.array([0,255,0], dtype=np.uint8)
+    #for j in range(len(calib)):
+    #    calib[j][cx] = np.array([0,255,0], dtype=np.uint8)
     display(calib*255, "Calibration img")
     
