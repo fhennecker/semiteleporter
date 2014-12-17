@@ -61,17 +61,13 @@ class ButtonBar(tk.Frame):
         tk.Button(self, text="Detect", command=self.refresh_scanner_input_menus).pack()
 
         tk.Label(self, text="Arduino serial port").pack()
-        self.arduino = tk.StringVar(self)
-        self.arduino.set(self.app.scanner.arduino_dev)
         options = Scanner.list_arduinos_candidates()
-        self.arduino_menu = tk.OptionMenu(self, self.arduino, *options)
+        self.arduino_menu = tk.OptionMenu(self, self.app.arduino, *options)
         self.arduino_menu.pack()
         
         tk.Label(self, text="Camera number").pack()
-        self.camera = tk.StringVar(self)
-        self.camera.set(str(self.app.scanner.cam_id))
         options = Scanner.list_cameras_indexes()
-        self.camera_menu = tk.OptionMenu(self, self.camera, *options)
+        self.camera_menu = tk.OptionMenu(self, self.app.camera, *options)
         self.camera_menu.pack()
         
         vertical_separator(self, w).pack()
@@ -80,6 +76,7 @@ class ButtonBar(tk.Frame):
         tk.Button(self, text="Scan", command=self.app.scan).pack()
         tk.Button(self, text="Scan & Dump", command=self.app.scan_dump).pack()
         tk.Button(self, text="Open dump", command=self.app.open).pack()
+        tk.Button(self, text="Reset calibration", command=lambda: self.app.is_calibrated.set(False)).pack()
         vertical_separator(self, w).pack()
         tk.Button(self, text="Export .obj", command=self.app.export_obj).pack()
         vertical_separator(self, w).pack()
@@ -101,11 +98,12 @@ class ImageZone(tk.Frame):
         # Add to canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.show()
-        self.canvas.get_tk_widget().pack()
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH)
         self.show_image(0x33*np.ones((height, width, 3), dtype=np.uint8))
         self.canvas.mpl_connect('button_press_event', self)
         app.Cx.trace('w', self.update_cross)
         app.Cy.trace('w', self.update_cross)
+        app.is_calibrated.trace('w', self.update_cross)
 
     def __call__(self, event):
         """Callback for matplotlib events"""
@@ -134,9 +132,10 @@ class ImageZone(tk.Frame):
         x = self.W * self.app.Cx.get()
         y = self.H * self.app.Cy.get()
         ax = self.show_image(self.image)
-        ax.plot([x, x], [0, self.H], 'r', zorder=1)
-        ax.plot([0, self.W], [y, y], 'r', zorder=2)
-        self.canvas.draw()
+        if self.app.is_calibrated.get():
+            ax.plot([x, x], [1, self.H-1], 'r', zorder=1)
+            ax.plot([1, self.W-1], [y, y], 'r', zorder=2)
+            self.canvas.draw()
 
     def update_cross(self, *args):
         if self.mode == self.Mode2D:
@@ -277,6 +276,9 @@ class App(tk.Tk):
         return self.scan(to_dir)
 
     def scan(self, to_dir=None):
+        self.scanner.arduino_dev = self.arduino.get()
+        self.scanner.cam_id = int(self.camera.get())
+        print "CAMERA %d" % (self.scanner.cam_id)
         self.points = None
         if self.is_calibrated.get():
             self.do_scan()
@@ -290,9 +292,7 @@ class App(tk.Tk):
                 "order to align the red cross with the center of the yellow "+
                 "cross, then click on \"Scan\" again."
             )
-            self.scanner.arduino_dev = self.arduino.get()
-            self.scanner.cam_id = int(self.camera.get())
-            mask = self.scanner.calibrate()
+            mask = self.scanner.calibrate(to_dir)
             self.frame.imgzone.show_image((255*mask))
             self.scan_iter = self.scanner.scan(to_dir)
             self.infotext.set(self.DESCRIPTION)
