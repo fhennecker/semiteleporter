@@ -21,11 +21,11 @@ class RenderParams(object):
 
     @property
     def GAMMA_L(self):
-        return atan(self.L/abs(LASER_L))
+        return atan(self.L/abs(self.LASER_L))
 
     @property
     def GAMMA_R(self):
-        return -atan(self.L/abs(LASER_R))
+        return -atan(self.L/abs(self.LASER_R))
 
     def save(self, filename):
         with open(filename, 'w') as outFile:
