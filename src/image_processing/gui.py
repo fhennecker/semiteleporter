@@ -137,10 +137,10 @@ class ImageZone(tk.Frame):
         self.canvas.draw()
         return ax
 
-    def show_cross(self):
+    def show_cross(self, image=None):
         x = self.W * self.app.Cx.get()
         y = self.H * self.app.Cy.get()
-        ax = self.show_image(self.image)
+        ax = self.show_image(self.image if image is None else image)
         if self.app.is_calibrated.get():
             ax.plot([x, x], [1, self.H-1], 'r', zorder=1)
             ax.plot([1, self.W-1], [y, y], 'r', zorder=2)
@@ -310,10 +310,10 @@ class App(tk.Tk):
         self.scanner.cam_id = int(self.camera.get())
         mask = self.scanner.calibrate()
         cx, cy = findCenter(mask)
-        self.Cx.set(cx)
-        self.Cy.set(cy)
-        self.frame.imgzone.show_cross()
-        # self.frame.imgzone.show_image(255*mask)
+        self.Cx.set(float(cx)/self.scanner.W)
+        self.Cy.set(float(cy)/self.scanner.H)
+        self.is_calibrated.set(True)
+        self.frame.imgzone.show_cross(255*mask)
         self.infotext.set(self.DESCRIPTION)
 
     def calibrate_and_dump(self):
