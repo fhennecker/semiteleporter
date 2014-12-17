@@ -81,9 +81,16 @@ class Renderer(multiprocessing.Process):
         self.left_pipe.feed(EndOfProcessing)
         self.right_pipe.feed(EndOfProcessing)
 
-if __name__ == "__main__":
-    from scanner import Scanner
-    p = RenderParams(335, CX=972, CY=782)
-    for points in Renderer(p, Scanner().replay("GLOBE")):
-        print points
+def test_params_save_load():
+    params = RenderParams(LASER_L=-42, LASER_R=24)
+    params.save("/tmp/renderparams.json")
+    copy = RenderParams.load("/tmp/renderparams.json")
+    assert copy.LASER_L == -42
+    assert copy.LASER_R == 24
 
+if __name__ == "__main__":
+    # Collect tests if not using py.test
+    _ = locals()
+    is_a_test = lambda x: x.startswith('test_') and '__call__' in dir(_[x])
+    for test_name in filter(is_a_test, _.keys()):
+        _[test_name]()

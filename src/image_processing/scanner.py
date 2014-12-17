@@ -70,6 +70,16 @@ class Scanner:
     def wait_arduino_boot(self):
         sleep(3)
 
+    def lasers_on(self):
+        with Serial(self.arduino_dev, 9600) as self.arduino:
+            self.wait_arduino_boot()
+            self.command_arduino('b')
+
+    def lasers_off(self):
+        with Serial(self.arduino_dev, 9600) as self.arduino:
+            self.wait_arduino_boot()
+            self.command_arduino('0')
+
     def scan(self, dump_to_dir=None, n_angles=80):
         """
         Return an iterator on (A, Io, Il, Ir), where
@@ -133,18 +143,23 @@ class Scanner:
         with Serial(self.arduino_dev, 9600) as self.arduino:
             self.wait_arduino_boot()
             self.command_arduino('p')
-            res = None
-            for i in range(5):
-                self.command_arduino('b')
-                img_with = self.photo()
-                self.command_arduino('0')
-                img_without = self.photo()
-                diff = (img_with - img_without).clip(0)
-                if res is None:
-                    res = diff
-                else:
-                    res += diff
-            self.mask = calibrationMask(img_without+res, img_without)
+            # res = None
+            # for i in range(5):
+            #     self.command_arduino('b')
+            #     img_with = self.photo()
+            #     self.command_arduino('0')
+            #     img_without = self.photo()
+            #     diff = (img_with - img_without).clip(0)
+            #     if res is None:
+            #         res = diff
+            #     else:
+            #         res += diff
+            # self.mask = calibrationMask(img_without+res, img_without)
+            self.command_arduino('b')
+            img_with = self.photo()
+            self.command_arduino('0')
+            img_without = self.photo()
+            self.mask = calibrationMask(img_with, img_without)
             if dump_to_dir is not None:
                 cv2.imwrite(os.path.join(dump_to_dir, "calibration.png"), self.mask)
             self.command_arduino('m')
