@@ -174,7 +174,7 @@ class InfoBar(tk.Frame):
     """Information and parameters bar"""
     def __init__(self, parent, app, **kwargs):
         infos = (
-            (("Cam lens <-> plate center (mm)", app.L), ("Relative cam height (mm)", app.H)), 
+            (("Stand <-> plate center (mm)", app.L), ("Relative cam height (mm)", app.H)), 
             (("Center x (ratio)", app.Cx), ("Center y (ratio)", app.Cy)),
             (("Left laser relative x (mm)", app.LASER_L), ("Right laser relative x (mm)", app.LASER_R))
         )
