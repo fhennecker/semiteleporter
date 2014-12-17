@@ -16,7 +16,7 @@ def findCenter(calib_img):
     currentHeight = height-1
     centerLow, centerHigh = 0, 0 # the center usually is a few pixels high
 
-    while centerHigh == 0:
+    while centerHigh == 0 and currentHeight >= 0:
         clustersNumber = 0;
         x = 1
         while x < width:
@@ -31,7 +31,18 @@ def findCenter(calib_img):
                 centerHigh = currentHeight
         currentHeight -= 1
 
-    return centerLow, centerHigh
+    resY = (centerLow+centerHigh) / 2 -1 # -1 is arbitrary. it compensates perspective
+    centerLeft, centerRight = 0, 0
+    x = 1
+    while x < width:
+        if calib_img[resY][x-1][2] == 1 and calib_img[resY][x][2] == 0:
+            centerLeft = x
+        elif calib_img[resY][x-1][2] == 0 and calib_img[resY][x][2] == 1: 
+            centerRight = x-1
+        x+=1
+
+    resX = (centerLeft+centerRight) / 2
+    return resX, resY
 
 def substract(image_with_lasers, image_without_lasers):
     """
@@ -146,9 +157,7 @@ if(__name__ == "__main__"):
     cx, cy = findCenter(calib)
     for i in range(len(calib[cx])):
         calib[cy][i] = np.array([0,255,0], dtype=np.uint8)
-    for i in range(len(calib[cx])):
-        calib[cx][i] = np.array([0,255,0], dtype=np.uint8)
-    #for j in range(len(calib)):
-    #    calib[j][cx] = np.array([0,255,0], dtype=np.uint8)
+    for j in range(len(calib)):
+        calib[j][cx] = np.array([0,255,0], dtype=np.uint8)
     display(calib*255, "Calibration img")
     
