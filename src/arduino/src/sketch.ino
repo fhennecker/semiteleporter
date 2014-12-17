@@ -8,24 +8,27 @@
   t/T: turn
   0: shut off both lasers
   b/B: light both lasers
+  p/P: put power on
+  m/M: put power off
  */
 
 /* Pinout */
 static const int dirPin = 2;
 static const int stepPin = 3;
 static const int laserLeftPin = 12;
-static const int laserRightPin = 13;
+static const int laserRightPin = 11;
+static const int powerPin = 4;
 
 /* Delay, in milliseconds, to ensure laser state totally changed (on/off time) */
 static const int lightDelay = 1;
 
 /* Delay, in microseconds, between each motor half step */
 static const int stepDelayMax = 2000;
-static const int stepDelayMin = 500;
-static int stepDelay = 2000;
+static const int stepDelayMin = 1500;
+static int stepDelay;
 
 /* Delay, in milliseconds to wait after motor turn (plate stabilization) */
-static const int afterTurnDelay = 100;
+static const int afterTurnDelay = 150;
 
 /* Number of steps for a complete rotation */
 static const int totalSteps = 8000;
@@ -35,6 +38,11 @@ void laser(bool left, bool right){
   digitalWrite(laserLeftPin, left ? HIGH : LOW);
   digitalWrite(laserRightPin, right ? HIGH : LOW);
   delay(lightDelay);
+}
+
+void power(bool on){
+  digitalWrite(powerPin, on ? HIGH : LOW);
+  delay(50);
 }
 
 /* Turn platform */
@@ -68,6 +76,8 @@ void setup() {
   digitalWrite(stepPin, LOW);
   pinMode(laserLeftPin, OUTPUT);
   pinMode(laserRightPin, OUTPUT);
+  pinMode(powerPin, OUTPUT);
+  digitalWrite(powerPin, LOW);
   laser(false, false);
 }
 
@@ -99,6 +109,16 @@ void loop() {
       case 't':
       case 'T':
         turn();
+        break;
+
+      case 'p':
+      case 'P':
+        power(true);
+        break;
+
+      case 'm':
+      case 'M':
+        power(false);
         break;
 
       /* Unknow command*/

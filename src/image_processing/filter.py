@@ -30,10 +30,10 @@ def substract(image_with_lasers, image_without_lasers):
     res = np.array(image_with_lasers*RedMask - image_without_lasers*RedMask, dtype=np.int16)
     return np.array(res.clip(0), dtype=np.uint8)
 
-def filterNoise(img):
+def filterNoise(img, thres_min=27, thres_max=255):
     """Apply filters to remove lonesome points"""
     img = cv2.GaussianBlur(img,(5,5),0)
-    ret, img = cv2.threshold(img, 27, 255, cv2.THRESH_TOZERO)
+    ret, img = cv2.threshold(img, thres_min, thres_max, cv2.THRESH_TOZERO)
     return img
 
 def massCenter(img, limit=None, output=None):
