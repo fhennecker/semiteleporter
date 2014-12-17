@@ -7,6 +7,7 @@ import tkMessageBox, tkFileDialog
 from PIL import Image, ImageTk
 from scanner import Scanner
 from renderer import RenderParams, Renderer
+from filter import findCenter
 from math import hypot
 from os import path
 from ObjConverter import ObjConverter
@@ -293,6 +294,7 @@ class App(tk.Tk):
             self.scanner.arduino_dev = self.arduino.get()
             self.scanner.cam_id = int(self.camera.get())
             mask = self.scanner.calibrate()
+            self.Cx, self.Cy = findCenter(mask)
             self.frame.imgzone.show_image((255*mask))
             self.scan_iter = self.scanner.scan(to_dir)
             self.infotext.set(self.DESCRIPTION)
