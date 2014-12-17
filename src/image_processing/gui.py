@@ -295,6 +295,7 @@ class App(tk.Tk):
             self.scanner.cam_id = int(self.camera.get())
             mask = self.scanner.calibrate()
             self.Cx, self.Cy = findCenter(mask)
+            self.show_cross()
             self.frame.imgzone.show_image((255*mask))
             self.scan_iter = self.scanner.scan(to_dir)
             self.infotext.set(self.DESCRIPTION)
