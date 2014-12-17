@@ -309,7 +309,11 @@ class App(tk.Tk):
         self.scanner.arduino_dev = self.arduino.get()
         self.scanner.cam_id = int(self.camera.get())
         mask = self.scanner.calibrate()
-        self.frame.imgzone.show_image(255*mask)
+        cx, cy = findCenter(mask)
+        self.Cx.set(cx)
+        self.Cy.set(cy)
+        self.frame.imgzone.show_cross()
+        # self.frame.imgzone.show_image(255*mask)
         self.infotext.set(self.DESCRIPTION)
 
     def calibrate_and_dump(self):
