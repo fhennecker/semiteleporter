@@ -327,12 +327,11 @@ class App(tk.Tk):
         self.scanner.arduino_dev = self.arduino.get()
         self.scanner.cam_id = int(self.camera.get())
         mask = self.scanner.calibrate()
+        self.frame.imgzone.show_image(255*mask)
         cx, cy = findCenter(mask)
         self.Cx.set(float(cx)/self.scanner.W)
         self.Cy.set(float(cy)/self.scanner.H)
         self.is_calibrated.set(True)
-        self.frame.imgzone.show_cross(255*mask)
-        self.infotext.set(self.DESCRIPTION)
 
     @might_raise
     def calibrate_and_dump(self):
@@ -348,6 +347,10 @@ class App(tk.Tk):
             tkMessageBox.showerror("File error", "Unable to open dump dir %s" % (from_dir))
         else:
             self.frame.imgzone.show_image(255*mask)
+            cx, cy = findCenter(mask)
+            self.Cx.set(float(cx)/self.scanner.W)
+            self.Cy.set(float(cy)/self.scanner.H)
+            self.is_calibrated.set(True)
 
     @might_raise
     def save_config(self):
