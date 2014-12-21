@@ -4,6 +4,7 @@ import Tkinter as tk
 import cv2
 import numpy as np
 import tkMessageBox, tkFileDialog
+import traceback
 from PIL import Image, ImageTk
 from scanner import Scanner
 from renderer import RenderParams, Renderer
@@ -42,6 +43,15 @@ def BooleanVar(master, value=False):
 def vertical_separator(parent, width):
     return tk.Frame(parent, height=3, width=width, bd=1, relief=tk.SUNKEN)
 
+def might_raise(func):
+    def wrap(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception as err:
+            traceback.print_exc()
+            tkMessageBox.showerror(err.__class__.__name__, err.message)
+    return wrap
+
 class ButtonBar(tk.Frame):
     """Action button bar on the left side"""
     def __init__(self, parent, app, width, height, **kwargs):
@@ -52,23 +62,24 @@ class ButtonBar(tk.Frame):
 
     def refresh_scanner_input_menus(self):
         self.arduino_menu.option_clear()
-        for option in Scanner.list_arduinos_candidates():
+        options = ["-"] + Scanner.list_arduinos_candidates()
+        for option in options:
             self.arduino_menu.option_add(option, option)
         self.camera_menu.option_clear()
-        for option in Scanner.list_cameras_indexes():
+        options = ["-"] + Scanner.list_cameras_indexes()
+        for option in options:
             self.camera_menu.option_add(str(option), str(option))
 
     def build_scanner_input_menus(self, w, h):
         tk.Label(self, text="Arduino serial port").pack()
-        options = Scanner.list_arduinos_candidates()
-        self.arduino_menu = tk.OptionMenu(self, self.app.arduino, *options)
+        self.arduino_menu = tk.OptionMenu(self, self.app.arduino, '-')
         self.arduino_menu.pack()
         
         tk.Label(self, text="Camera number").pack()
-        options = Scanner.list_cameras_indexes()
-        self.camera_menu = tk.OptionMenu(self, self.app.camera, *options)
+        self.camera_menu = tk.OptionMenu(self, self.app.camera, '-')
         self.camera_menu.pack()
-        
+
+        self.refresh_scanner_input_menus()        
         vertical_separator(self, w).pack()
 
     def build_action_buttons(self, w, h):
@@ -89,6 +100,7 @@ class ButtonBar(tk.Frame):
         tk.Button(self, text="Lasers on", command=self.app.scanner.lasers_on).pack()
         tk.Button(self, text="Lasers off", command=self.app.scanner.lasers_off).pack()
         vertical_separator(self, w).pack()
+        tk.Button(self, text="Quit", command=self.app.quit).pack(side=tk.RIGHT)
 
 class ImageZone(tk.Frame):
     """Main image zone"""
@@ -266,9 +278,11 @@ class App(tk.Tk):
             THRES=self.THRES.get()
         )
 
+    @might_raise
     def reset_calibration(self):
         self.is_calibrated.set(False)
 
+    @might_raise
     def do_scan(self, scan_iter):
         self.infotext.set("Scanning...")
         self.points = None
@@ -282,6 +296,7 @@ class App(tk.Tk):
         self.infotext.set(self.DESCRIPTION)
         self.points = all_points
 
+    @might_raise
     def scan_from_dump(self):
         if not self.is_calibrated.get():
             tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
@@ -289,6 +304,7 @@ class App(tk.Tk):
             from_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
             self.do_scan(self.scanner.replay(from_dir))
 
+    @might_raise
     def scan_from_scanner(self, to_dir=None):
         if not self.is_calibrated.get():
             tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
@@ -297,6 +313,7 @@ class App(tk.Tk):
             self.scanner.cam_id = int(self.camera.get())
             self.do_scan(self.scanner.scan(to_dir))
 
+    @might_raise
     def scan_and_dump(self):
         if not self.is_calibrated.get():
             tkMessageBox.showerror("Missing calibration", "You must calibrate the scan first")
@@ -304,6 +321,7 @@ class App(tk.Tk):
             to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose destination directory")
             self.scan_from_scanner(to_dir)
 
+    @might_raise
     def calibrate_from_scanner(self, to_dir=None):
         self.infotext.set("Acquiring calibration image")
         self.scanner.arduino_dev = self.arduino.get()
@@ -316,11 +334,13 @@ class App(tk.Tk):
         self.frame.imgzone.show_cross(255*mask)
         self.infotext.set(self.DESCRIPTION)
 
+    @might_raise
     def calibrate_and_dump(self):
         to_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
         if to_dir:
             self.calibrate_from_scanner(to_dir)
 
+    @might_raise
     def calibrate_from_dump(self):
         from_dir = tkFileDialog.askdirectory(mustexist=True, title="Choose source directory")
         mask = self.scanner.calibrate_from(from_dir)
@@ -329,11 +349,13 @@ class App(tk.Tk):
         else:
             self.frame.imgzone.show_image(255*mask)
 
+    @might_raise
     def save_config(self):
         filename = tkFileDialog.asksaveasfilename(defaultextension='.json', title="Save config")
         if filename:
             self.render_params.save(filename)
 
+    @might_raise
     def load_config(self):
         filename = tkFileDialog.askopenfilename(title="Load config")
         if filename:
@@ -347,6 +369,7 @@ class App(tk.Tk):
             self.THRES.set(params.THRES)
             self.is_calibrated.set(True)
 
+    @might_raise
     def export_obj(self):
         if self.points is None:
             tkMessageBox.showerror("No object", 
