@@ -6,6 +6,9 @@ RedMask = np.array([[[0, 0, 1]]])
 
 
 def calibrationMask(img_with, img_without):
+    """
+    Extracts the laser lines and removes the lonesome points
+    """
     res = substract(img_with, img_without)
     res = filterNoise(res)
     return (res-1)/255

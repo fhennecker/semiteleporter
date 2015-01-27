@@ -28,6 +28,8 @@ class Scanner:
                 "/dev/ttyUSB*", 
                 "/dev/tty.usbmodem*"
             ]), [])
+    #The glob module finds all the pathnames matching the specified pattern
+    #map() applies glob() to every item of iterable and return a list of the results
 
     @classmethod
     def list_cameras_indexes(klass):
@@ -45,6 +47,14 @@ class Scanner:
     def command_arduino(self, cmd):
         """
         Send a command to the arduino and wait for its answer
+          Commands are :
+            r/R: light right laser
+            l/L: light left laser
+            t/T: turn
+            0: shut off both lasers
+            b/B: light both lasers
+            p/P: put power on
+            m/M: put power off
         """
         assert len(cmd) == 1
         self.arduino.write(cmd)
@@ -82,7 +92,7 @@ class Scanner:
 
     def scan(self, dump_to_dir=None, n_angles=80):
         """
-        Return an iterator on (A, Io, Il, Ir), where
+        Returns an iterator (a generator in fact : yield replaces return) on (A, Io, Il, Ir), where
         - A is the current angle
         - Io is the image without lasers
         - Il is the image with left laser
@@ -96,6 +106,7 @@ class Scanner:
         except:
             raise self.NoCalibrationError()
         with Serial(self.arduino_dev, 9600) as self.arduino:
+            # self.arduino = Serial(self.arduino_dev,9600)
             self.wait_arduino_boot() # Wait arduino boot
             self.command_arduino('p') # put power on
             self.command_arduino('0') # Shut off lasers
@@ -115,11 +126,12 @@ class Scanner:
                 left  *= self.mask
                 right *= self.mask
                 yield angle, off, left, right
+                #generates this tuple on demand (=lower memory usage)
             self.command_arduino('m') #Put power off
 
     def replay(self, from_dir, n_angles=80):
         """
-        Return an iterator on (A, Io, Il, Ir), where
+        Return an generator on (A, Io, Il, Ir), where
         - A is the current angle
         - Io is the image without lasers
         - Il is the image with left laser

@@ -44,6 +44,7 @@ def vertical_separator(parent, width):
     return tk.Frame(parent, height=3, width=width, bd=1, relief=tk.SUNKEN)
 
 def might_raise(func):
+    """Used as a @decorator of func to trap errors and to display the error message in a message box"""
     def wrap(*args, **kwargs):
         try:
             func(*args, **kwargs)
@@ -61,8 +62,9 @@ class ButtonBar(tk.Frame):
         self.build_action_buttons(width, height)
 
     def refresh_scanner_input_menus(self):
+        """Builds the drop down lists for the selection of the arduino port and the camera"""
         self.arduino_menu.option_clear()
-        options = ["-"] + Scanner.list_arduinos_candidates()
+        options = ["-"] + Scanner.list_arduinos_candidates() #class method
         for option in options:
             self.arduino_menu.option_add(option, option)
         self.camera_menu.option_clear()
@@ -127,7 +129,7 @@ class ImageZone(tk.Frame):
         app.is_calibrated.trace('w', self.update_cross)
 
     def __call__(self, event):
-        """Callback for matplotlib events"""
+        """Callback for matplotlib events : shows a cross for calibration at the clicked point"""
         x, y = event.xdata, event.ydata
         if x is None or y is None or self.mode is self.Mode3D:
             return
@@ -266,8 +268,10 @@ class App(tk.Tk):
         # Build GUI
         self.frame = MainFrame(self)
 
+    #the property decorator turns render_params() method as a getter
     @property
     def render_params(self):
+        """Gives the parameters of the rendering engine"""
         return RenderParams(
             CX=self.Cx.get()*self.scanner.W,
             CY=self.Cy.get()*self.scanner.H,
