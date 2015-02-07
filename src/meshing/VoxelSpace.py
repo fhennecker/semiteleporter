@@ -7,6 +7,9 @@ class VoxelSpace:
 		self.voxelSize = voxelSize
 		self.voxels = {}
 
+	def numberOfVoxels(self):
+		return len(self.voxels);
+
 	def voxelIndexForPoint(self, x, y, z):
 		""" Returns the index of the voxel the point x, y, z belongs to """
 		xVoxel = floor(x/self.voxelSize)
@@ -54,29 +57,34 @@ class VoxelSpace:
 						res += self.voxels[key]
 		return res
 
-	def pointsInLayer(self, vx, vy, vz, innerLayer=1, outerLayer=1):
-		""" vx, vy and vz define the index of a VOXEL
-			Returns a list of all points within a hollow voxel cube."""
-
-		# allows to have a 1-thin layer by specifying only innerLayer
-		if outerLayer < innerLayer:
-			outerLayer = innerLayer
+	def voxelsInLayer(self, vx, vy, vz, innerLayer=1, outerLayer=1):
+		""" Returns a list of all voxels containing points within a hollow voxel cube. """
 
 		def layerRangeBuilder(vc):
-			return range(vc-outerLayer, vc+outerLayer+1)
+			return range(int(vc-outerLayer), int(vc+outerLayer+1))
 
 		def shouldBeIgnored(x, y, z): # returns all voxels within emtpy cube core
-			return      (x > vx-innerLayer and x < vx+innerLayer) \
+			return  ((x, y, z) not in self.voxels) \
+					or ((x > vx-innerLayer and x < vx+innerLayer) \
 					and (y > vy-innerLayer and y < vy+innerLayer) \
-					and (z > vz-innerLayer and z < vz+innerLayer)
+					and (z > vz-innerLayer and z < vz+innerLayer))
 
 		res = []
 		for x in layerRangeBuilder(vx):
 			for y in layerRangeBuilder(vy):
 				for z in layerRangeBuilder(vz):
-					key = (x, y, z)
-					if not shouldBeIgnored(x, y, z) and key in self.voxels:
-						res += self.voxels[key]
+					if not shouldBeIgnored(x, y, z):
+						res.append((x, y, z))
+		return res
+
+	def pointsInVoxels(self, voxels):
+		res = []
+		for voxel in voxels:
+			if voxel in self.voxels:
+				res += self.voxels[voxel]
+		return res
+
+
 
 		return res
 
