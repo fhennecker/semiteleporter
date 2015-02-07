@@ -37,19 +37,47 @@ class VoxelSpace:
 			res += self.voxels[voxel]
 		return res
 
-	def pointsInCube(self, xCenter, yCenter, zCenter, neighbours=0):
-		""" xCenter, yCenter and zCenter define the index of a VOXEL
+	def pointsInCube(self, vx, vy, vz, neighbours=0):
+		""" vx, vy and vz define the index of a VOXEL
 			Returns a list of all points within the cube :
-			[xCenter-neighbours, xCenter+neighbours]
-			[yCenter-neighbours, yCenter+neighbours]
-			[zCenter-neighbours, zCenter+neighbours] """
+			[vx-neighbours, vx+neighbours]x[vy-neighbours, vy+neighbours]x[vz-neighbours, vz+neighbours] """
+
+		def rangeBuilder(vc):
+			return range(vc-neighbours, vc+neighbours+1)
+
 		res = []
-		for x in range(xCenter-neighbours, xCenter+neighbours+1):
-			for y in range(yCenter-neighbours, yCenter+neighbours+1):
-				for z in range(zCenter-neighbours, zCenter+neighbours+1):
+		for x in rangeBuilder(vx):
+			for y in rangeBuilder(vy):
+				for z in rangeBuilder(vz):
 					key = (x, y, z)
 					if key in self.voxels:
 						res += self.voxels[key]
+		return res
+
+	def pointsInLayer(self, vx, vy, vz, innerLayer=1, outerLayer=1):
+		""" vx, vy and vz define the index of a VOXEL
+			Returns a list of all points within a hollow voxel cube."""
+
+		# allows to have a 1-thin layer by specifying only innerLayer
+		if outerLayer < innerLayer:
+			outerLayer = innerLayer
+
+		def layerRangeBuilder(vc):
+			return range(vc-outerLayer, vc+outerLayer+1)
+
+		def shouldBeIgnored(x, y, z): # returns all voxels within emtpy cube core
+			return      (x > vx-innerLayer and x < vx+innerLayer) \
+					and (y > vy-innerLayer and y < vy+innerLayer) \
+					and (z > vz-innerLayer and z < vz+innerLayer)
+
+		res = []
+		for x in layerRangeBuilder(vx):
+			for y in layerRangeBuilder(vy):
+				for z in layerRangeBuilder(vz):
+					key = (x, y, z)
+					if not shouldBeIgnored(x, y, z) and key in self.voxels:
+						res += self.voxels[key]
+
 		return res
 
 if __name__ == "__main__":
@@ -64,3 +92,5 @@ if __name__ == "__main__":
 	print space.voxels
 	print "Points in cube :"
 	print space.pointsInCube(1, 0, 0, 0)
+	print "Points in layer :"
+	print space.pointsInLayer(1, 0, 0)
