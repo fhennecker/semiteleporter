@@ -1,4 +1,4 @@
-from math import floor
+from math import floor, sqrt
 
 class VoxelSpace:
 	""" VoxelSpace holds points within voxels. It makes it easier to find
@@ -86,6 +86,33 @@ class VoxelSpace:
 
 
 
+	def closestPointTo(self, x, y, z, distanceLimit=10):
+		""" Finds and returns the closest point to (x, y z) 
+			we'll only look in voxels within distanceLimit (distance in voxels)"""
+		
+		def distance(a, b): # distance between two 3D points
+			return sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2)
+
+		res = None
+		# we're going to look through the closest layer first, and go one layer
+		# further while we don't find any point
+		currentLayer = 0 
+		numberOfVoxelsChecked = 0
+		currentDistance = float('inf')
+		cx, cy, cz = self.voxelIndexForPoint(x, y, z)
+
+		checking = False # if we find a point, we'll need to check if there's no closer one in the next layer
+
+		while (res == None or checking) and numberOfVoxelsChecked < self.numberOfVoxels() and currentLayer < distanceLimit:
+			voxelsToCheck = self.voxelsInLayer(cx, cy, cz, currentLayer, currentLayer)
+			for point in self.pointsInVoxels(voxelsToCheck):
+				if distance((x, y, z), point) < currentDistance:
+					currentDistance = distance((x, y, z), point)
+					res = point
+					checking = not checking # if checking is false, we found the first candidate
+											# if it is true, we were checking and we need to get out of the while
+			currentLayer+=1
+			numberOfVoxelsChecked += len(voxelsToCheck)
 		return res
 
 if __name__ == "__main__":
@@ -101,4 +128,18 @@ if __name__ == "__main__":
 	print "Points in cube :"
 	print space.pointsInCube(1, 0, 0, 0)
 	print "Points in layer :"
-	print space.pointsInLayer(1, 0, 0)
+	print space.pointsInVoxels(space.voxelsInLayer(1, 0, 0))
+
+	# testing closestPointTo
+	points = VoxelSpace(10)
+	points.addPoints([(0, 0, 9), (0, 0, 11), (0, 0, 0)])
+	print "Closest point to 0,0,0"
+	print points.closestPointTo(0,0,0)
+	print "Closest point to 0,0,9"
+	print points.closestPointTo(0,0,9)
+	print "Closest point to 0,0,10"
+	print points.closestPointTo(0,0,10)
+	print "Closest point to 0,0,9.99"
+	print points.closestPointTo(0,0,9.99)
+	print "Closest point to 1000,1000,1000"
+	print points.closestPointTo(1000,1000,1000)
