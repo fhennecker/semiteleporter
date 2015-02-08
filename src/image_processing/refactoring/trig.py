@@ -1,6 +1,10 @@
 import  os, sys, logging, getopt, ConfigParser, cv2
 import Tkinter
 import numpy as np
+import serial
+from time import sleep
+import inspect
+import multiprocessing
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -8,42 +12,51 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class Arduino:
-    def __init__(self, port):
+    def __init__(self, port, isActive):
         """ Create a new Arduino object
         port = the serial port for the arduino
         """
-        logging.debug("Create Arduino @ %s" % (port))
-        self.serialPort = serial.Serial(port, 9600)
-        logging.debug("Booting Arduino...")
-        self.sleep(3)
+        logging.debug("Create Arduino @ port %s" % (port))
+        self.isActive = isActive
+        try:
+            self.serialPort = serial.Serial(port, 115200)
+            logging.debug("Handshaking with Arduino...")
+            sleep(2)
+        except:
+            logging.warning("\033[93m No arduino connected / bad serial port.. \033[0m")
 
     def command(self, cmd):
-        self.serialPort.write(cmd)
-        while self.serialPort.read(1) != cmd:
-            pass
-        
+        #FIXME better way to do that
+        if(self.isActive):
+            self.serialPort.write(cmd)
+
 
 
 class Laser:
-    def __init__(self, position, yAngle, arduino):
+    def __init__(self, pin, position, yAngle, arduino):
         """ Create a new Laser object
+        pin      = number of the pin connected to the arduino
         position = [X, Y, Z], laser position
         yAngle   = angle of the laser plane with YZ plane in degree (left=positive)
         arduino  = the arduino interface
         """
 
-        logging.debug("Create laser @ %s, yAngle=%.2f" % (position, yAngle))
+        logging.debug("Create laser @ %s, yAngle=%.2f, pin=%s" % (position, yAngle, pin))
 
+        self.pin      = pin
         self.position = position
         self.yAngle   = np.radians(yAngle)
         self.arduino  = arduino
-        self.v1  = np.array([0,1,0], dtype=np.float32)
-        self.v2  = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float32)
+        self.v1       = np.array([0,1,0], dtype=np.float32)
+        self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float32)
 
     def switch(self, switchOn):
-        #FIXME control the laser on/off here
-        logging.debug('Switching laser %s' %('ON' if switchOn else 'OFF'))
-        pass
+        if(switchOn):
+            self.arduino.command(self.pin.upper())
+            logging.debug('Switching laser on pin %s %s' %(self.pin, 'ON'))
+        else:
+            self.arduino.command(self.pin.lower())
+            logging.debug('Switching laser on pin %s %s' %(self.pin, 'OFF'))
 
 
 class Camera:
@@ -124,6 +137,7 @@ class TurnTable:
 
     def rotate(self, step=1):
         logging.debug('Rotating the turntable')
+        self.arduino.command('T')
         #FIXME control the stepper motor to rotate here
         
 
@@ -139,6 +153,11 @@ class Scene:
         self.turntable  = turntable
         self.imageProcessor = ImageProcessor()
         self.calibMask  = None
+        self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
+                                   self.getWorldPoint)
+
+    def __iter__(self):
+        return self.pipeline.__iter__()
 
     def calibration(self):
         self.laser.switch(True)
@@ -184,14 +203,16 @@ class Scene:
         
         return worldPoints
 
-    def get3dView(self, step):
+    def runStep(self, step, isLastStep):
         self.laser.switch(True)
         imgLaserOn = self.camera.getPicture()#*self.calibMask
         self.laser.switch(False)
         imgLaserOff = self.camera.getPicture()
 
-        cameraPoints = self.imageProcessor.extractPoints(imgLaserOn, imgLaserOff)
-        return self.getWorldPoint(cameraPoints, step)
+        self.pipeline.feed((imgLaserOn, imgLaserOff, step))
+        if(isLastStep):
+            self.pipeline.terminate()
+
 
 
 class ImageProcessor:
@@ -220,11 +241,79 @@ class ImageProcessor:
 
         return points
 
-    def extractPoints(self, laserOn, laserOff):
-        res = self.substract(laserOn, laserOff)
+    def extractPoints(self, imgLaserOn, imgLaserOff):
+        res = self.substract(imgLaserOn, imgLaserOff)
         res = self.filterNoise(res)
         res = self.massCenter(res)
         return res
+
+
+class EndOfProcessing:
+    pass
+
+
+class PipelineStage(multiprocessing.Process):
+    def __init__(self, method, in_queue, out_queue):
+        """ Create a new PipelineStage object
+        method    = the method to apply
+        in_queue  = the queue of inputs jobs
+        out_queue = the queue of results
+        """
+        super(PipelineStage, self).__init__()
+        self.method    = method
+        self.in_queue  = in_queue
+        self.out_queue = out_queue
+
+    def run(self):
+        args = self.in_queue.get()
+
+        while(args != EndOfProcessing):
+            try:
+                nbrOfArgs = len(inspect.getargspec(self.method).args)-1
+                res = (self.method(*args[:nbrOfArgs]),)+args[nbrOfArgs:]
+                self.out_queue.put(res)
+            except:
+                logging.error("Bad args format in PipelineStage '%s'" %(self.method.__name__))
+            args = self.in_queue.get()
+        self.out_queue.put(EndOfProcessing)
+        logging.info("Process '%s' down" %(self.method.__name__))
+
+
+class Pipeline:
+    def __init__(self, *methods):
+        """ Create a new Pipeline object
+        output  = the output container of the pipeline
+        methods = all methods applied by the pipeline in the same order
+        """
+        self.in_queue = multiprocessing.Queue()
+        self.out_queue = multiprocessing.Queue()
+        self.stages   = []
+
+        in_queue = self.in_queue
+        out_queue = None
+        for order in range(len(methods)):
+            if(order == len(methods)-1):
+                self.stages.append(PipelineStage(methods[order], in_queue, self.out_queue))
+            else:
+                out_queue = multiprocessing.Queue()
+                self.stages.append(PipelineStage(methods[order], in_queue, out_queue))
+                in_queue = out_queue
+        self.start()
+
+    def __iter__(self):
+        item = self.out_queue.get()
+        while(item != EndOfProcessing):
+            yield item[0]
+            item = self.out_queue.get()
+            
+    def start(self):
+        map(PipelineStage.start, self.stages)
+
+    def feed(self, arg):
+        self.in_queue.put(arg)
+
+    def terminate(self):
+        self.feed(EndOfProcessing)
 
 
 class Scanner3D(Tkinter.Tk):
@@ -297,12 +386,12 @@ class Scanner3D(Tkinter.Tk):
             self.imageExtension = config.get('File', 'extension')
 
             self.camera = Camera((float(config.get('Camera', 'width')), float(config.get('Camera', 'height'))),
-                               np.array(config.get('Camera', 'position').split(','), dtype=np.float32),
-                               np.array(config.get('Camera', 'rotation').split(','), dtype=np.float32),
+                                  np.array(config.get('Camera', 'position').split(','), dtype=np.float32),
+                                  np.array(config.get('Camera', 'rotation').split(','), dtype=np.float32),
                                   float(config.get('Camera', 'viewAngle')),
-                               self.directory)
+                                  self.directory)
 
-            arduino = Arduino(config.get('Arduino', 'serial'))
+            arduino = Arduino(config.get('Arduino', 'port'), True if (self.directory == "") else False)
 
             self.turntable = TurnTable(np.array(config.get('TurnTable', 'position').split(','), dtype=np.float32),
                                        float(config.get('TurnTable', 'diameter')),
@@ -311,11 +400,11 @@ class Scanner3D(Tkinter.Tk):
 
             # Assume that Laser point to the center of the turntable
             pos = np.array(config.get('LaserRight', 'position').split(','), dtype=np.float32)
-            laserRight = Laser(pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
+            laserRight = Laser(config.get('LaserRight','pin'), pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
             self.sceneRight = Scene(self.camera, laserRight, self.turntable)
 
             pos = np.array(config.get('LaserLeft', 'position').split(','), dtype=np.float32)
-            laserLeft = Laser(pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
+            laserLeft = Laser(config.get('LaserLeft','pin'), pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
             self.sceneLeft  = Scene(self.camera, laserLeft,  self.turntable)    
 
         except:
@@ -325,7 +414,6 @@ class Scanner3D(Tkinter.Tk):
     def run(self):
         logging.info('\t\033[92m----- Start scanning -----\033[0m')
 
-        points = []
         logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
         raw_input('')
         self.sceneLeft.calibration()
@@ -334,12 +422,19 @@ class Scanner3D(Tkinter.Tk):
         raw_input('')
 
         for step in range(self.turntable.nSteps):
-            points += self.sceneLeft.get3dView(step)
-            points += self.sceneRight.get3dView(step)
+            self.sceneLeft.runStep(step, True if(step==self.turntable.nSteps-1) else False)
+            self.sceneRight.runStep(step, True if(step==self.turntable.nSteps-1) else False)
             self.turntable.rotate()
             logging.info('Step %d done', step+1)
 
-        logging.info('\033[92m Scanning done \033[0m')
+        logging.info('\033[92m Scanning DONE \033[0m')
+
+        points = []
+        for item in self.sceneLeft:
+            points += item
+        for item in self.sceneRight:
+            points += item
+
         self.plot(points)
 
     def plot(self, points):
