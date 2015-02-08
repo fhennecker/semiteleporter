@@ -317,12 +317,18 @@ class Pipeline:
 
 
 class Config:
-    def __init__(self, configFile):
+    def __init__(self, configFile=""):
         """ Create a new Config object
         configFile = name of the config file
         """
-        self.configFile = configFile
+        self.default = "default.cfg"
+
+        if(configFile == ""):
+            self.configFile = self.default
+        else:
+            self.configFile = configFile
         self.config = dict()
+        self.parser = ConfigParser.ConfigParser()
         self.load()
 
     def __getitem__(self, index):
@@ -332,7 +338,6 @@ class Config:
         """ This method read the config file """
         if(configFile != ""):
             self.configFile = configFile
-        self.parser = ConfigParser.ConfigParser()
 
         if(os.path.exists(self.configFile)):
             logging.info('Parsing %s configuration file ...' % self.configFile)
@@ -351,7 +356,26 @@ class Config:
         else:
             logging.error("File %s don't exist" % self.configFile)
             sys.exit(2)
-            
+
+    def save(self, configFile=""):
+        if((configFile == "" and self.configFile == self.default) or self.configFile == self.default):
+            configFile = "default_1.cfg"
+        logging.info("Saving configuration in %s" %(configFile))
+
+        for section in self.config:
+            for option in self.config[section]:
+                value = self.config[section][option]
+                if('numpy' in str(type(value))):
+                    value = str(list(value))[1:-1]
+                else:
+                    value = str(value)
+                try:
+                    self.parser.set(section, option, value)
+                except:
+                    self.parser.add_section(section)
+                    self.parser.set(section, option, value)
+        self.parser.write(open(configFile,'w'))
+
 
 
 class Scanner3D(Tkinter.Tk):
@@ -359,7 +383,7 @@ class Scanner3D(Tkinter.Tk):
         """ Create a new Scanner3D object
         args = arguments passed in the command line
         """
-        self.config     = Config("default.cfg")
+        self.config     = Config()
         self.laserLeft  = None
         self.sceneLeft  = None
         self.laserRight = None
@@ -492,7 +516,7 @@ class Scanner3D(Tkinter.Tk):
         plt.show()
         
 
-class Gui:
+class Gui():
     def __init__(self, config):
         """ Create a new Gui object
         config = the Config object shared with the Scanner object
