@@ -123,7 +123,7 @@ class TurnTable:
 
         self.position  = position
         self.diameter  = diameter
-        self.nSteps    = nSteps
+        self.nSteps    = int(nSteps)
         self.arduino   = arduino
         self.stepAngle = 2.0*np.pi/nSteps
 
@@ -316,18 +316,58 @@ class Pipeline:
         self.feed(EndOfProcessing)
 
 
+class Config:
+    def __init__(self, configFile):
+        """ Create a new Config object
+        configFile = name of the config file
+        """
+        self.configFile = configFile
+        self.config = dict()
+        self.load()
+
+    def __getitem__(self, index):
+        return self.config[index]
+
+    def load(self, configFile=""):
+        """ This method read the config file """
+        if(configFile != ""):
+            self.configFile = configFile
+        self.parser = ConfigParser.ConfigParser()
+
+        if(os.path.exists(self.configFile)):
+            logging.info('Parsing %s configuration file ...' % self.configFile)
+            self.parser.read(self.configFile)
+
+            for section in self.parser.sections():
+                self.config[section] = dict()
+                for option in self.parser.options(section):
+                    value = self.parser.get(section, option)
+                    if(value.isdigit()):
+                        self.config[section][option] = float(value)
+                    elif(',' in value):
+                        self.config[section][option] = np.array(value.split(','), dtype=np.float32)
+                    else:
+                        self.config[section][option] = value
+        else:
+            logging.error("File %s don't exist" % self.configFile)
+            sys.exit(2)
+            
+
+
 class Scanner3D(Tkinter.Tk):
     def __init__(self, args):
         """ Create a new Scanner3D object
         args = arguments passed in the command line
         """
-        self.configFile = "default.cfg"
-        self.directory  = ""
-        self.logLevel   = logging.WARNING
-        self.camera     = None
+        self.config     = Config("default.cfg")
+        self.laserLeft  = None
         self.sceneLeft  = None
+        self.laserRight = None
         self.sceneRight = None
         self.turntable  = None
+        self.gui        = None
+        self.directory  = ""
+        self.logLevel   = logging.WARNING
     
         self.parseArgv(args)
         self.loadConfig()
@@ -340,78 +380,79 @@ class Scanner3D(Tkinter.Tk):
         print("  --config    , -c <filename>  : use filename as configuration file (default=default.cfg)")
         print("  --processing, -p <directory> : use directory as the path to the directory of pictures to process (when you don't use the scanner)")
         print("  --loglevel  , -l <loglevel>  : set logelevel (default=WARNING)")
+        print("  --gui       , -g             : start gui")
 
 
     def parseArgv(self,args):
         """ This method parse command line """
         try:
-            opts, arguments = getopt.getopt(args[1:],"c:l:p:h",["file=", "loglevel=", "directory=", "help"])
+            opts, arguments = getopt.getopt(args[1:],"c:l:p:hg",["file=", "loglevel=", "directory=", "help", "gui"])
         except getopt.GetoptError as err:
             logging.error(str(err))
             self.usage(args)
             sys.exit(2)
 
+        startGui = False
         for o,a in opts:
             if(o in ("-h", "--help")):
                 self.usage(args)
                 sys.exit()
             elif(o in ("-c", "--config")):
-                self.cfgFilename = a
+                self.config = Config(a)
             elif(o in ("-l", "--loglevel")):
                 try:
                     self.logLevel = getattr(logging, a.upper())
+                    logging.getLogger().setLevel(self.logLevel)
                 except:
                     logging.error("Invalid loglevel")
                     sys.exit(2)
             elif(o in ("-p", "--processing")):
                 self.directory = a
+            elif(o in ("-g", "--gui")):
+                self.gui = Gui(self.config)
             else:
                 assert False, "Unknown option"
 
-        logging.getLogger().setLevel(self.logLevel)
-
 
     def loadConfig(self):
-        """ This method read the config file """
-        if(not os.path.exists(self.configFile)):
-            logging.error("File %s don't exist" % self.configFile)
-            sys.exit(2)
-            
-        logging.info('Parsing %s configuration file ...' % self.configFile)
-        config = ConfigParser.ConfigParser()
-        config.read(self.configFile)
 
-        # Define setup
-        try:
-            self.imageExtension = config.get('File', 'extension')
+        camera = Camera((self.config['Camera']['width'], self.config['Camera']['height']),
+                         self.config['Camera']['position'],
+                         self.config['Camera']['rotation'],
+                         self.config['Camera']['viewangle'],
+                         self.directory)
 
-            self.camera = Camera((float(config.get('Camera', 'width')), float(config.get('Camera', 'height'))),
-                                  np.array(config.get('Camera', 'position').split(','), dtype=np.float32),
-                                  np.array(config.get('Camera', 'rotation').split(','), dtype=np.float32),
-                                  float(config.get('Camera', 'viewAngle')),
-                                  self.directory)
+        arduino = Arduino(self.config['Arduino']['port'],
+                          True if (self.directory == "") else False)
 
-            arduino = Arduino(config.get('Arduino', 'port'), True if (self.directory == "") else False)
+        self.turntable = TurnTable(self.config['TurnTable']['position'],
+                                   self.config['TurnTable']['diameter'],
+                                   self.config['TurnTable']['steps'],
+                                   arduino)
 
-            self.turntable = TurnTable(np.array(config.get('TurnTable', 'position').split(','), dtype=np.float32),
-                                       float(config.get('TurnTable', 'diameter')),
-                                       int(config.get('TurnTable', 'steps')),
-                                       arduino)
+        # Assume that Laser point to the center of the turntable
+        pos = self.config['LaserRight']['position']
+        self.laserRight = Laser(self.config['LaserRight']['pin'],
+                           pos,
+                           np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
+                           arduino)
+        self.sceneRight = Scene(camera, self.laserRight, self.turntable)
 
-            # Assume that Laser point to the center of the turntable
-            pos = np.array(config.get('LaserRight', 'position').split(','), dtype=np.float32)
-            laserRight = Laser(config.get('LaserRight','pin'), pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
-            self.sceneRight = Scene(self.camera, laserRight, self.turntable)
+        pos = self.config['LaserLeft']['position']
+        self.laserLeft = Laser(self.config['LaserLeft']['pin'],
+                          pos,
+                          np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
+                          arduino)
+        self.sceneLeft  = Scene(camera, self.laserLeft,  self.turntable)    
 
-            pos = np.array(config.get('LaserLeft', 'position').split(','), dtype=np.float32)
-            laserLeft = Laser(config.get('LaserLeft','pin'), pos, np.degrees(np.arctan(pos[0]/self.turntable.position[2])), arduino)
-            self.sceneLeft  = Scene(self.camera, laserLeft,  self.turntable)    
-
-        except:
-            logging.error('Syntax error in %s', self.configFile)
-            sys.exit(2)
 
     def run(self):
+        if(self.gui == None):
+            self.startScan()
+        else:
+            self.gui.start()
+
+    def startScan(self):
         logging.info('\t\033[92m----- Start scanning -----\033[0m')
 
         logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
@@ -450,6 +491,17 @@ class Scanner3D(Tkinter.Tk):
         ax.set_zlim3d(0,500)
         plt.show()
         
+
+class Gui:
+    def __init__(self, config):
+        """ Create a new Gui object
+        config = the Config object shared with the Scanner object
+        """
+        self.config = config
+
+    def start(self):
+        pass
+        #self.mainloop()
 
 
 if(__name__ == "__main__"):
