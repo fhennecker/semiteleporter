@@ -1,4 +1,19 @@
 from math import floor, sqrt
+import numpy as np
+
+def flatten(list_of_lists):
+	"""[[a, b], [c, d]] -> [a, b, c, d]"""
+	return reduce(list.__add__, list_of_lists, [])
+
+def combine(head, *tail):
+	"""
+	Generate all possible combinations of a set of list
+	[[a, b], [c, d]] -> [(a,c), (a,d), (b,c), (b,d)]
+	(works on higher dimensions)
+	"""
+	if not tail:
+		return [(h,) for h in head]
+	return [(h,) + t for h in head for t in combine(tail[0], *tail[1:])]
 
 class VoxelSpace:
 	""" VoxelSpace holds points within voxels. It makes it easier to find
@@ -8,13 +23,14 @@ class VoxelSpace:
 		self.voxels = {}
 
 	def numberOfVoxels(self):
-		return len(self.voxels);
+		return len(self.voxels)
 
 	def voxelIndexForPoint(self, x, y, z):
 		""" Returns the index of the voxel the point x, y, z belongs to """
-		xVoxel = floor(x/self.voxelSize)
-		yVoxel = floor(y/self.voxelSize)
-		zVoxel = floor(z/self.voxelSize)
+		fl = lambda x: int(floor(x))
+		xVoxel = fl(x/self.voxelSize)
+		yVoxel = fl(y/self.voxelSize)
+		zVoxel = fl(z/self.voxelSize)
 		return (xVoxel, yVoxel, zVoxel)
 
 	def addPoint(self, x, y, z):
@@ -22,7 +38,7 @@ class VoxelSpace:
 		key = self.voxelIndexForPoint(x, y, z)
 
 		# creating a new voxel if necessary
-		if not key in self.voxels:
+		if key not in self.voxels:
 			self.voxels[key] = []
 
 		self.voxels[key].append((x, y, z))
@@ -41,105 +57,96 @@ class VoxelSpace:
 		return res
 
 	def pointsInCube(self, vx, vy, vz, neighbours=0):
-		""" vx, vy and vz define the index of a VOXEL
-			Returns a list of all points within the cube :
-			[vx-neighbours, vx+neighbours]x[vy-neighbours, vy+neighbours]x[vz-neighbours, vz+neighbours] """
+		"""
+		Returns a list of all points within a cube centered on vx,vy,vz
+		extended to neighbours
+		"""
+		return self.pointsInVoxels(self.voxelsInLayer(vx, vy, vz, 0, neighbours))
 
-		def rangeBuilder(vc):
-			return range(vc-neighbours, vc+neighbours+1)
+	def voxelsInLayer(self, vx, vy, vz, inner=1, outer=2):
+		"""
+		Returns a list of all voxels containing points within a hollow voxel cube.
+		"""
+		# Top and bottom planes
+		x, y = range(vx-outer+1, vx+outer), range(vy-outer+1, vy+outer)
+		voxels = combine(x, y, range(vz-outer+1, vz-inner+1))
+		voxels += combine(x, y, range(vz+inner, vz+outer))
 
-		res = []
-		for x in rangeBuilder(vx):
-			for y in rangeBuilder(vy):
-				for z in rangeBuilder(vz):
-					key = (x, y, z)
-					if key in self.voxels:
-						res += self.voxels[key]
-		return res
+		# Left and right planes
+		y, z = range(vy-outer, vy+outer), range(vz-inner+1, vz+inner)
+		voxels += combine(range(vx-outer+1, vx-inner+1), y, z)
+		voxels += combine(range(vx+inner, vx+outer), y, z)
 
-	def voxelsInLayer(self, vx, vy, vz, innerLayer=1, outerLayer=1):
-		""" Returns a list of all voxels containing points within a hollow voxel cube. """
+		# Front and back planes
+		x, z = range(vx-inner+1, vx+inner), range(vz-inner+1, vz+inner)
+		voxels += combine(x, range(vy-outer+1, vy-inner+1), z)
+		voxels += combine(x, range(vy+inner, vy+outer), z)
 
-		def layerRangeBuilder(vc):
-			return range(int(vc-outerLayer), int(vc+outerLayer+1))
-
-		def shouldBeIgnored(x, y, z): # returns all voxels within emtpy cube core
-			return  ((x, y, z) not in self.voxels) \
-					or ((x > vx-innerLayer and x < vx+innerLayer) \
-					and (y > vy-innerLayer and y < vy+innerLayer) \
-					and (z > vz-innerLayer and z < vz+innerLayer))
-
-		res = []
-		for x in layerRangeBuilder(vx):
-			for y in layerRangeBuilder(vy):
-				for z in layerRangeBuilder(vz):
-					if not shouldBeIgnored(x, y, z):
-						res.append((x, y, z))
-		return res
+		# Return only non-empty
+		return filter(self.voxels.get, voxels)
 
 	def pointsInVoxels(self, voxels):
-		res = []
-		for voxel in voxels:
-			if voxel in self.voxels:
-				res += self.voxels[voxel]
-		return res
-
-
+		get = lambda xyz: self.voxels.get(xyz, [])
+		return flatten(map(get, voxels))
 
 	def closestPointTo(self, x, y, z, distanceLimit=10):
 		""" Finds and returns the closest point to (x, y z) 
 			we'll only look in voxels within distanceLimit (distance in voxels)"""
 		
-		def distance(a, b): # distance between two 3D points
-			return sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2)
-
-		res = None
-		# we're going to look through the closest layer first, and go one layer
-		# further while we don't find any point
-		currentLayer = 0 
-		numberOfVoxelsChecked = 0
-		currentDistance = float('inf')
+		p0 = np.array([x, y, z])
+		distance = lambda p: np.linalg.norm(np.array(p) - p0)
 		cx, cy, cz = self.voxelIndexForPoint(x, y, z)
 
-		checking = False # if we find a point, we'll need to check if there's no closer one in the next layer
+		for i in range(distanceLimit):
+			points = self.pointsInVoxels(self.voxelsInLayer(cx, cy, cz, i, i+1))
+			# Invariant: if we find points in a layer, the nearest one is in
+			#            this list (we examine layers incrementally)
+			if points:
+				return sorted(points, key=distance)[0]
 
-		while (res == None or checking) and numberOfVoxelsChecked < self.numberOfVoxels() and currentLayer < distanceLimit:
-			voxelsToCheck = self.voxelsInLayer(cx, cy, cz, currentLayer, currentLayer)
-			for point in self.pointsInVoxels(voxelsToCheck):
-				if distance((x, y, z), point) < currentDistance:
-					currentDistance = distance((x, y, z), point)
-					res = point
-					checking = not checking # if checking is false, we found the first candidate
-											# if it is true, we were checking and we need to get out of the while
-			currentLayer+=1
-			numberOfVoxelsChecked += len(voxelsToCheck)
-		return res
+def test_flatten():
+	assert flatten([[1, 2], [3, 4]]) == [1, 2, 3, 4]
 
-if __name__ == "__main__":
-	# test suite
+def test_combine():
+	assert combine(range(2)) == [(0,), (1,)]
+	assert set(combine(range(2), range(2))) == set([(0,0), (0,1), (1,0), (1,1)])
+	c = set(combine(range(2), range(2), range(2))) 
+	s = set([(0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)])
+	assert c == s
+
+def test_partition():
 	space = VoxelSpace(5)
-	space.addPoint(0, 0, 0)
-	space.addPoint(1.1, 2.2, 3.3)
-	space.addPoints([(-1, -1, -1), (5, 3, 2), (6, 6, 6)])
-	print "All points : "
-	print space.allPoints()
-	print "All voxels : "
-	print space.voxels
-	print "Points in cube :"
-	print space.pointsInCube(1, 0, 0, 0)
-	print "Points in layer :"
-	print space.pointsInVoxels(space.voxelsInLayer(1, 0, 0))
+	POINTS = [(0,0,0), (1.1,2.2,3.3), (-1,-1,-1), (5,3,2), (6,6,6)]
 
-	# testing closestPointTo
+	space.addPoint(*POINTS[0])
+	space.addPoint(*POINTS[1])
+	space.addPoints(POINTS[2:])
+	assert set(space.allPoints()) == set(POINTS) # Order may vary
+	assert space.voxels == {
+		(0,0,0): [(0,0,0), (1.1,2.2,3.3)], 
+		(1,0,0): [(5,3,2)],
+		(1,1,1): [(6,6,6)],
+		(-1,-1,-1): [(-1,-1,-1)]
+	}
+	assert set(space.pointsInCube(0, 0, 0, 2)) == set(POINTS)
+	voxels = set(space.voxelsInLayer(0, 0, 0, 1, 2))
+	assert voxels == set([(1,0,0), (1,1,1), (-1,-1,-1)])
+	got = set(space.pointsInVoxels(voxels))
+	expected = set(flatten(space.voxels.values())) ^ set(space.voxels[(0,0,0)])
+	assert got == expected
+
+def test_closestPointTo():
 	points = VoxelSpace(10)
 	points.addPoints([(0, 0, 9), (0, 0, 11), (0, 0, 0)])
-	print "Closest point to 0,0,0"
-	print points.closestPointTo(0,0,0)
-	print "Closest point to 0,0,9"
-	print points.closestPointTo(0,0,9)
-	print "Closest point to 0,0,10"
-	print points.closestPointTo(0,0,10)
-	print "Closest point to 0,0,9.99"
-	print points.closestPointTo(0,0,9.99)
-	print "Closest point to 1000,1000,1000"
-	print points.closestPointTo(1000,1000,1000)
+	assert points.closestPointTo(0, 0, 0) == (0, 0, 0)
+	assert points.closestPointTo(1, 0, 0) == (0, 0, 0)
+	assert points.closestPointTo(0, 0, 9.99) == (0, 0, 9)
+	assert points.closestPointTo(0, 0, 10.01) == (0, 0, 11)
+	assert points.closestPointTo(0, 0, 10) in [(0, 0, 9), (0, 0, 11)]
+	assert points.closestPointTo(1000,1000,1000) is None, "Point too far"
+
+if __name__ == "__main__":
+	test_flatten()
+	test_combine()
+	test_partition()
+	test_closestPointTo()
