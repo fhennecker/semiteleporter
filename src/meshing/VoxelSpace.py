@@ -101,6 +101,18 @@ class VoxelSpace:
 		# Return only non-empty
 		return filter(self.voxels.get, voxels)
 
+	def voxelsInCube(self, cornerA, cornerB):
+		""" Returns all voxels within the cube defined by the two corners in argument"""
+		def rangeBuilder(a, b):
+			if a < b :
+				return range(a, b+1)
+			else:
+				return range(b, a+1)
+		voxels = combine(rangeBuilder(cornerA[0], cornerB[0]), \
+						rangeBuilder(cornerA[1], cornerB[1]), \
+						rangeBuilder(cornerA[2], cornerB[2]))
+		return filter(self.voxels.get, voxels)
+
 	def pointsInVoxels(self, voxels):
 		get = lambda xyz: self.voxels.get(xyz, [])
 		return flatten(map(get, voxels))
@@ -164,8 +176,20 @@ def test_closestPointTo():
 	assert points.closestPointTo(0, 0, 10) in [(0, 0, 9), (0, 0, 11)]
 	assert points.closestPointTo(1000,1000,1000) is None, "Point too far"
 
+def test_voxelsInCube():
+	points = VoxelSpace(10)
+	points.addPoints([(0, 0, 0), (10, 0, 0), (0, 10, 0), (10, 10, 10)])
+	voxels = points.voxelsInCube((0,0,0), (1, 1, 1))
+	assert len(voxels) == 4
+	assert (0,0,0) in voxels
+	assert (1,0,0) in voxels
+	assert (0,1,0) in voxels
+	assert (1,1,1) in voxels
+
 if __name__ == "__main__":
 	test_flatten()
 	test_combine()
 	test_partition()
 	test_closestPointTo()
+	test_voxelsInCube()
+	
