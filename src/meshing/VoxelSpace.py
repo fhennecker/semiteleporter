@@ -22,6 +22,11 @@ class VoxelSpace:
 		self.voxelSize = voxelSize
 		self.voxels = {}
 
+	def __str__(self):
+		return 	"VoxelSpace<voxelSize="+str(self.voxelSize)+\
+				", #voxels="+str(self.numberOfVoxels())+\
+				", #points="+str(sum(len(self.voxels[voxel]) for voxel in self.voxels))+">"
+
 	def numberOfVoxels(self):
 		return len(self.voxels)
 
