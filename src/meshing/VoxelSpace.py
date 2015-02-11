@@ -26,10 +26,17 @@ class VoxelSpace:
 	def __str__(self):
 		return 	"VoxelSpace<voxelSize="+str(self.voxelSize)+\
 				", #voxels="+str(self.numberOfVoxels())+\
-				", #points="+str(sum(len(self.voxels[voxel]) for voxel in self.voxels))+">"
+				", #points="+str(self.numberOfPoints())+\
+				", avg(points/voxel)="+str(self.averagePointsPerVoxel())+">"
 
 	def numberOfVoxels(self):
 		return len(self.voxels)
+
+	def numberOfPoints(self):
+		return sum(len(self.voxels[voxel]) for voxel in self.voxels)
+
+	def averagePointsPerVoxel(self):
+		return float(self.numberOfPoints())/self.numberOfVoxels()
 
 	def voxelIndexForPoint(self, x, y, z):
 		""" Returns the index of the voxel the point x, y, z belongs to """
