@@ -21,6 +21,7 @@ class VoxelSpace:
 	def __init__(self, voxelSize=10):
 		self.voxelSize = voxelSize
 		self.voxels = {}
+		self.highestPoint = None
 
 	def __str__(self):
 		return 	"VoxelSpace<voxelSize="+str(self.voxelSize)+\
@@ -47,6 +48,9 @@ class VoxelSpace:
 			self.voxels[key] = []
 
 		self.voxels[key].append((x, y, z))
+
+		if self.highestPoint == None or z > self.highestPoint[2]:
+			self.highestPoint = (x, y, z)
 
 	def addPoints(self, pointsList):
 		""" Adds a list of points in this format (lists can be changed to tuples):
@@ -108,6 +112,9 @@ class VoxelSpace:
 			#            this list (we examine layers incrementally)
 			if points:
 				return sorted(points, key=distance)[0]
+
+	def highestPoint(self):
+		return self.highestPoint
 
 def test_flatten():
 	assert flatten([[1, 2], [3, 4]]) == [1, 2, 3, 4]
