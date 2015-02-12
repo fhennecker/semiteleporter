@@ -1,5 +1,5 @@
-import  os, sys, logging, getopt, ConfigParser, cv2
-import Tkinter
+import  os, sys, logging, getopt, ConfigParser, glob, cv2
+import Tkinter, ttk, tkFileDialog
 import numpy as np
 import serial
 from time import sleep
@@ -44,11 +44,11 @@ class Laser:
         logging.debug("Create laser @ %s, yAngle=%.2f, pin=%s" % (position, yAngle, pin))
 
         self.pin      = pin
-        self.position = position
+        self.position = np.array(position, dtype=np.float64)
         self.yAngle   = np.radians(yAngle)
         self.arduino  = arduino
-        self.v1       = np.array([0,1,0], dtype=np.float32)
-        self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float32)
+        self.v1       = np.array([0,1,0], dtype=np.float64)
+        self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float64)
 
     def switch(self, switchOn):
         if(switchOn):
@@ -72,10 +72,10 @@ class Camera:
         logging.debug("Create Camera (%.2f, %.2f) @ %s, viewAngle = %.2f, rotation = %s" %(shape[0], shape[1], position, viewAngle, rotation))
 
         self.shape     = shape
-        self.position  = position
+        self.position  = np.array(position, dtype=np.float64)
         self.distance  = (shape[0]/2)/np.tan(np.radians(viewAngle)/2)
         self.viewAngle = viewAngle
-        self.rotation  = np.radians(rotation)
+        self.rotation  = np.radians(np.array(rotation, dtype=np.float64))
         self.pictures  = []
 
         if(pictureDirectory != ""):
@@ -121,7 +121,7 @@ class TurnTable:
 
         logging.debug("Create turntable @ %s, diameter = %.2f" % (position, diameter))
 
-        self.position  = position
+        self.position  = np.array(position, dtype=np.float64)
         self.diameter  = diameter
         self.nSteps    = int(nSteps)
         self.arduino   = arduino
@@ -340,7 +340,7 @@ class Config:
             self.configFile = configFile
 
         if(os.path.exists(self.configFile)):
-            logging.info('Parsing %s configuration file ...' % self.configFile)
+            logging.info("Loading %s configuration file" % self.configFile)
             self.parser.read(self.configFile)
 
             for section in self.parser.sections():
@@ -350,13 +350,29 @@ class Config:
                     if(value.isdigit()):
                         self.config[section][option] = float(value)
                     elif(',' in value):
-                        self.config[section][option] = np.array(value.split(','), dtype=np.float32)
+                        self.config[section][option] = np.array(value.split(','), dtype=np.float64)
                     else:
                         self.config[section][option] = value
         else:
             logging.error("File %s don't exist" % self.configFile)
             sys.exit(2)
 
+    def getToStr(self, section, option, toList=True):
+        value = self.config
+        try:
+            value = self.config[section][option]
+
+            if('numpy' in str(type(value))):
+                if(toList):
+                    value = list(value)
+                else:
+                    value = str(list(value))[1:-1]
+            else:
+                value = str(value)
+        except:
+            logging.error("Bad indexing in Config dico")
+        return value
+            
     def save(self, configFile=""):
         if((configFile == "" and self.configFile == self.default) or self.configFile == self.default):
             configFile = "default_1.cfg"
@@ -364,11 +380,7 @@ class Config:
 
         for section in self.config:
             for option in self.config[section]:
-                value = self.config[section][option]
-                if('numpy' in str(type(value))):
-                    value = str(list(value))[1:-1]
-                else:
-                    value = str(value)
+                value = self.getToStr(section, option,False)
                 try:
                     self.parser.set(section, option, value)
                 except:
@@ -394,7 +406,6 @@ class Scanner3D(Tkinter.Tk):
         self.logLevel   = logging.WARNING
     
         self.parseArgv(args)
-        self.loadConfig()
 
 
     def usage(self, args):
@@ -416,7 +427,6 @@ class Scanner3D(Tkinter.Tk):
             self.usage(args)
             sys.exit(2)
 
-        startGui = False
         for o,a in opts:
             if(o in ("-h", "--help")):
                 self.usage(args)
@@ -472,9 +482,10 @@ class Scanner3D(Tkinter.Tk):
 
     def run(self):
         if(self.gui == None):
+            self.loadConfig()
             self.startScan()
         else:
-            self.gui.start()
+            self.gui.run()
 
     def startScan(self):
         logging.info('\t\033[92m----- Start scanning -----\033[0m')
@@ -516,16 +527,161 @@ class Scanner3D(Tkinter.Tk):
         plt.show()
         
 
-class Gui():
+#---------------------------------------------------------
+
+class Tab(Tkinter.Frame):
+    def __init__(self, rootTab, title=""):
+        self.rootTab = rootTab
+        Tkinter.Frame.__init__(self, self.rootTab, width=800, height=600)
+        self.rootTab.add(self, text=title)
+
+
+class SetupTab(Tab):
+    def __init__(self, rootTab, config):
+        Tab.__init__(self, rootTab, "Setup")
+        self.config  = config
+        self.entries = dict()
+
+        for i in range(6):
+            self.rowconfigure(i, weight=1)
+        for i in range(3):
+            self.columnconfigure(i, weight=1)
+
+        self.createSectionFrame("Arduino").grid(row=0, column=0, columnspan=3)
+        self.createSectionFrame("Camera").grid(row=1, column=0, columnspan=3)
+        self.createSectionFrame("LaserLeft").grid(row=2, column=0, columnspan=3)
+        self.createSectionFrame("LaserRight").grid(row=3, column=0, columnspan=3)
+        self.createSectionFrame("TurnTable").grid(row=4, column=0, columnspan=3)
+        Tkinter.Button(self, text="Open", command=self.openConfigFile).grid(row=5, column=0, sticky='e')
+        Tkinter.Button(self, text="Load", command=self.loadConfigFile).grid(row=5, column=1)
+        Tkinter.Button(self, text="Save", command=self.saveConfigFile).grid(row=5, column=2, sticky='w')
+
+    def createSectionFrame(self, section):
+        frame = Tkinter.LabelFrame(self, text=section, font=("bold"))
+
+        self.entries[section] = dict()
+        line = 0
+        for option in self.config[section]:
+            value = self.config.getToStr(section, option)
+            if(type(value) == list):
+                varList = []
+                Tkinter.Label(frame, text=option+" :").grid(row=line, column=0)
+                line += 1
+                for item,letter,col in zip(value, range(123-len(value),123), range(0,2*len(value),2)):
+                    Tkinter.Label(frame, text=(chr(letter).upper()+" :")).grid(row=line, column=col)
+                    varList.append(Tkinter.StringVar(frame, item))
+                    Tkinter.Entry(frame, background="white", textvariable=varList[-1]).grid(row=line, column=col+1)
+                self.entries[section][option] = varList
+            else:
+                Tkinter.Label(frame, text=option).grid(row=line, column=0)
+                self.entries[section][option] = Tkinter.StringVar(frame, value)
+                if(option == "port"):
+                    path = self.entries[section][option].get()[:-1]+"*"
+                    ttk.Combobox(frame, textvariable=self.entries[section][option], values=glob.glob(path), state='readonly', background="white").grid(row=line, column=1, padx=5, pady=5)
+                else:
+                    Tkinter.Entry(frame, background="white", textvariable=self.entries[section][option]).grid(row=line, column=1)
+            line += 1
+        return frame
+
+    def refresh(self):
+        for section in self.entries:
+            for option in self.entries[section]:
+                res = self.entries[section][option]
+                if(type(res) == list):
+                    for entry,idx in zip(res,range(len(res))):
+                        entry.set(self.config[section][option][idx])
+                else:
+                    res.set(self.config[section][option])
+
+    def openConfigFile(self):
+        ext = None
+        filename = None
+        while(ext !=".cfg" and filename != ''):
+            filename = tkFileDialog.askopenfilename(defaultextension=".cfg")
+            ext = os.path.splitext(filename)[-1]
+        if(filename != ''):
+            self.config.load(filename)
+            self.refresh()
+
+    def loadConfigFile(self):
+        logging.info("Loading Gui config to Config object")
+        for section in self.entries:
+            for option in self.entries[section]:
+                res = self.entries[section][option]
+                if(type(res) == list):
+                    res = [res[0].get(),res[1].get(),res[2].get()]
+                    self.config[section][option] = np.array(res, dtype=np.float64)
+                elif(res.get().isdigit()):
+                    self.config[section][option] = float(res.get())
+                else:
+                    self.config[section][option] = res.get()
+
+    def saveConfigFile(self):
+        ext = None
+        filename = None
+        while(ext!=".cfg" and filename != ''):
+            filename = tkFileDialog.asksaveasfilename(defaultextension=".cfg")
+            ext = os.path.splitext(filename)[-1]
+        if(filename != ''):
+            self.config.save(filename)
+
+
+class ViewerTab(Tab):
+    def __init__(self, rootTab, config):
+        Tab.__init__(self, rootTab, "Viewer")
+        self.createPlot()
+        self.createOptions()
+
+    def createPlot(self):
+        points = [[],[],[]]
+        fig = plt.figure()
+        graph = FigureCanvasTkAgg(fig, master=self)
+        graph.get_tk_widget().grid(row=0, column=0)
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+        ax.set_xlabel('X axis')
+        ax.set_xlim3d(-250,250)
+        ax.set_ylabel('Y axis')
+        ax.set_ylim3d(-250,250)
+        ax.set_zlabel('Z axis')
+        ax.set_zlim3d(0,500)
+        graph.show()
+
+    def createOptions(self):
+        frame = Tkinter.LabelFrame(self, text="Options", font=("bold"))
+        frame.grid(row=0, column=1)
+        Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=1, sticky='e')
+
+    def start(self):
+        pass
+
+
+class Gui(Tkinter.Tk):
     def __init__(self, config):
         """ Create a new Gui object
         config = the Config object shared with the Scanner object
         """
+        logging.info("Starting Gui")
         self.config = config
+        Tkinter.Tk.__init__(self, None)
+        self.title("Scanner 3D")
 
-    def start(self):
-        pass
-        #self.mainloop()
+        self.rootTab   = ttk.Notebook(self)
+        self.setupTab  = SetupTab(self.rootTab, self.config)
+        self.viewerTab = ViewerTab(self.rootTab, self.config)
+
+        self.rootTab.pack(fill='both',expand=True)
+
+        self.bind('<Control-q>', lambda ev: self.quit())
+        self.bind('<Control-w>', lambda ev: self.quit())
+        self.protocol('WM_DELETE_WINDOW', exit)
+
+    def run(self):
+        self.mainloop()
+
+    def exit(self):
+        self.destroy()
+        self.quit()
 
 
 if(__name__ == "__main__"):
