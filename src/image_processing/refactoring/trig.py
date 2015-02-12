@@ -1,7 +1,8 @@
 import  os, sys, logging, getopt, ConfigParser, glob, cv2
-import Tkinter, ttk, tkFileDialog
+import Tkinter, ttk, tkFileDialog, tkMessageBox
 import numpy as np
 import serial
+import threading
 from time import sleep
 import inspect
 import multiprocessing
@@ -401,7 +402,7 @@ class Scanner3D(Tkinter.Tk):
         self.laserRight = None
         self.sceneRight = None
         self.turntable  = None
-        self.gui        = None
+        self.gui        = Gui(self)
         self.directory  = ""
         self.logLevel   = logging.WARNING
     
@@ -415,13 +416,13 @@ class Scanner3D(Tkinter.Tk):
         print("  --config    , -c <filename>  : use filename as configuration file (default=default.cfg)")
         print("  --processing, -p <directory> : use directory as the path to the directory of pictures to process (when you don't use the scanner)")
         print("  --loglevel  , -l <loglevel>  : set logelevel (default=WARNING)")
-        print("  --gui       , -g             : start gui")
+        print("  --arduino   , -a <path>      : start communication arduino")
 
 
     def parseArgv(self,args):
         """ This method parse command line """
         try:
-            opts, arguments = getopt.getopt(args[1:],"c:l:p:hg",["file=", "loglevel=", "directory=", "help", "gui"])
+            opts, arguments = getopt.getopt(args[1:],"c:l:p:a:h",["file=", "loglevel=", "directory=", "arduino", "help"])
         except getopt.GetoptError as err:
             logging.error(str(err))
             self.usage(args)
@@ -442,8 +443,9 @@ class Scanner3D(Tkinter.Tk):
                     sys.exit(2)
             elif(o in ("-p", "--processing")):
                 self.directory = a
-            elif(o in ("-g", "--gui")):
-                self.gui = Gui(self.config)
+            elif(o in ("-a", "--arduino")):
+                #TODO direct communication with arduino
+                pass
             else:
                 assert False, "Unknown option"
 
@@ -481,22 +483,26 @@ class Scanner3D(Tkinter.Tk):
 
 
     def run(self):
-        if(self.gui == None):
-            self.loadConfig()
-            self.startScan()
-        else:
-            self.gui.run()
+        self.gui.run()
 
     def startScan(self):
+        self.loadConfig()
         logging.info('\t\033[92m----- Start scanning -----\033[0m')
 
         logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
-        raw_input('')
+        if(self.gui == None):
+            raw_input('')
+        else:
+            self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
         self.sceneLeft.calibration()
         self.sceneRight.calibration()
         logging.info('\033[94m Calibration : done, place your object on the table and press ENTER...\033[0m')
-        raw_input('')
+        if(self.gui == None):
+            raw_input('')
+        else:
+            self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
 
+        self.gui.startPlot()
         for step in range(self.turntable.nSteps):
             self.sceneLeft.runStep(step, True if(step==self.turntable.nSteps-1) else False)
             self.sceneRight.runStep(step, True if(step==self.turntable.nSteps-1) else False)
@@ -505,32 +511,15 @@ class Scanner3D(Tkinter.Tk):
 
         logging.info('\033[92m Scanning DONE \033[0m')
 
-        points = []
-        for item in self.sceneLeft:
-            points += item
-        for item in self.sceneRight:
-            points += item
-
-        self.plot(points)
-
-    def plot(self, points):
-        points = np.array(points).T
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
-        ax.set_xlabel('X axis')
-        ax.set_xlim3d(-250,250)
-        ax.set_ylabel('Y axis')
-        ax.set_ylim3d(-250,250)
-        ax.set_zlabel('Z axis')
-        ax.set_zlim3d(0,500)
-        plt.show()
-        
 
 #---------------------------------------------------------
 
 class Tab(Tkinter.Frame):
     def __init__(self, rootTab, title=""):
+        """ Create a new 'abstract' Tab object
+        rootTab = the Notebook reference
+        title   = the name of the tab
+        """
         self.rootTab = rootTab
         Tkinter.Frame.__init__(self, self.rootTab, width=800, height=600)
         self.rootTab.add(self, text=title)
@@ -538,6 +527,10 @@ class Tab(Tkinter.Frame):
 
 class SetupTab(Tab):
     def __init__(self, rootTab, config):
+        """ Create a new SetupTab object
+        rootTab = the Notebook reference
+        config  = the reference to the Config object from the Scanner
+        """
         Tab.__init__(self, rootTab, "Setup")
         self.config  = config
         self.entries = dict()
@@ -627,54 +620,76 @@ class SetupTab(Tab):
 
 
 class ViewerTab(Tab):
-    def __init__(self, rootTab, config):
+    def __init__(self, rootTab, scanner):
+        """ Create a new ViewerTab object
+        rootTab = the Notebook reference
+        scanner = the Scanner reference
+        """
         Tab.__init__(self, rootTab, "Viewer")
-        self.createPlot()
+
+        self.scanner = scanner
+        self.graph   = None
+        self.axis    = None
+        self.createGraph()
         self.createOptions()
 
-    def createPlot(self):
-        points = [[],[],[]]
-        fig = plt.figure()
-        graph = FigureCanvasTkAgg(fig, master=self)
-        graph.get_tk_widget().grid(row=0, column=0)
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
-        ax.set_xlabel('X axis')
-        ax.set_xlim3d(-250,250)
-        ax.set_ylabel('Y axis')
-        ax.set_ylim3d(-250,250)
-        ax.set_zlabel('Z axis')
-        ax.set_zlim3d(0,500)
-        graph.show()
+    def createGraph(self, init=True):
+        if(init):
+            self.figure = plt.figure()
+            self.graph = FigureCanvasTkAgg(self.figure, master=self)
+            self.graph.get_tk_widget().grid(row=0, column=0)
+            self.axis = self.figure.add_subplot(111, projection='3d')
+        else:
+            self.axis.clear()
+        self.axis.set_xlabel('X axis')
+        self.axis.set_xlim3d(-250,250)
+        self.axis.set_ylabel('Y axis')
+        self.axis.set_ylim3d(-250,250)
+        self.axis.set_zlabel('Z axis')
+        self.axis.set_zlim3d(0,500)
+        self.graph.show()
 
     def createOptions(self):
         frame = Tkinter.LabelFrame(self, text="Options", font=("bold"))
         frame.grid(row=0, column=1)
-        Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=1, sticky='e')
+        Tkinter.Button(frame, text="Start", command=self.scanner.startScan).grid(row=0, column=0)
 
-    def start(self):
-        pass
+    def plot(self, startThread=True):
+        if(startThread):
+            self.createGraph(False)
+            logging.info("Start plotting thread")
+            thread = threading.Thread(target=self.plot, args=(False,))
+            thread.start()
+        else:
+            for item_left, item_right in zip(self.scanner.sceneLeft, self.scanner.sceneRight):
+                points = np.array(item_left + item_right).T
+                self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+                self.graph.draw()
+
 
 
 class Gui(Tkinter.Tk):
-    def __init__(self, config):
+    def __init__(self, scanner):
         """ Create a new Gui object
-        config = the Config object shared with the Scanner object
+        scanner = reference to the Scanner object
         """
         logging.info("Starting Gui")
-        self.config = config
         Tkinter.Tk.__init__(self, None)
+
         self.title("Scanner 3D")
-
         self.rootTab   = ttk.Notebook(self)
-        self.setupTab  = SetupTab(self.rootTab, self.config)
-        self.viewerTab = ViewerTab(self.rootTab, self.config)
-
         self.rootTab.pack(fill='both',expand=True)
+        self.viewerTab = ViewerTab(self.rootTab, scanner)
+        self.setupTab  = SetupTab(self.rootTab, scanner.config)
 
-        self.bind('<Control-q>', lambda ev: self.quit())
-        self.bind('<Control-w>', lambda ev: self.quit())
         self.protocol('WM_DELETE_WINDOW', exit)
+
+    def popUpConfirm(self, title, info):
+        tkMessageBox.showinfo(title, info)
+        self.update()
+
+    def startPlot(self):
+        self.viewerTab.plot()
 
     def run(self):
         self.mainloop()
