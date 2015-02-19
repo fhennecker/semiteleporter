@@ -218,6 +218,7 @@ class VoxelSpace:
 				for point in self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer)):
 					print "checking for", point
 					distance = point.distance(a)+point.distance(b)
+					print bestDistance, distance
 					if distance < bestDistance:
 						bestDistance = distance
 						res = point
