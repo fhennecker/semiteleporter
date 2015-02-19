@@ -57,3 +57,5 @@ target/
 
 # 3D files
 *.obj
+!src/meshing/teapot.obj
+!src/meshing/teapot_pc.obj
