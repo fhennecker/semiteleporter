@@ -137,20 +137,25 @@ class VoxelSpace:
 		# Return only non-empty
 		return list(set(filter(self.voxels.get, voxels)))
 
-	def voxelsAroundRegion(self, cornerA, cornerB, layerSize=1):
+	def voxelsAroundRegion(self, cornerA, cornerB, inner=1, outer=1):
+		if outer < inner:
+			outer = inner
+
 		def rangeBuilder(a, b, extension):
 			if a < b :
 				return range(a-extension, b+extension+1)
 			else:
 				return range(b-extension, a+extension+1)
 		# getting whole cube
-		voxels = combine(rangeBuilder(cornerA[0], cornerB[0], layerSize), \
-						rangeBuilder(cornerA[1], cornerB[1], layerSize), \
-						rangeBuilder(cornerA[1], cornerB[1], layerSize))
+		voxels = combine(rangeBuilder(cornerA[0], cornerB[0], outer), \
+						rangeBuilder(cornerA[1], cornerB[1], outer), \
+						rangeBuilder(cornerA[1], cornerB[1], outer))
 
 		voxels = filter(self.voxels.get, voxels)
 		# removing center
-		toRemove = self.voxelsInRegion(cornerA, cornerB)
+		toRemove = combine(rangeBuilder(cornerA[0], cornerB[0], inner-1), \
+							rangeBuilder(cornerA[1], cornerB[1], inner-1), \
+							rangeBuilder(cornerA[1], cornerB[1], inner-1))
 		return filter(self.voxels.get, [x for x in voxels if x not in toRemove])
 
 	def voxelsInRegion(self, cornerA, cornerB):
@@ -189,6 +194,36 @@ class VoxelSpace:
 					return resList[1]
 				else:
 					return None
+
+	def closestPointToEdge(self, a, b, distanceLimit=10):
+		""" Finds the point p which minimizes distance(a,p)+distance(b,p) """
+		aVoxel = self.voxelIndexForPoint(a)
+		bVoxel = self.voxelIndexForPoint(b)
+		res = None
+		bestDistance = float("inf")
+
+		for point in self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel)):
+			print "checking for", point
+			if point != a and point != b:
+				distance = point.distance(a)+point.distance(b)
+				if distance < bestDistance:
+					bestDistance = distance
+					res = point
+
+		# didn't find any point, start looking in layers around region
+		if not res:
+			print "did not find point in region"
+			layer = 1
+			while layer<distanceLimit and not res:
+				for point in self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer)):
+					print "checking for", point
+					distance = point.distance(a)+point.distance(b)
+					if distance < bestDistance:
+						bestDistance = distance
+						res = point
+				layer += 1
+
+		return res
 
 	def getHighestPoint(self):
 		return self.highestPoint

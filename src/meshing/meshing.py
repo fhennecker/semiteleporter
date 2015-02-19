@@ -23,12 +23,11 @@ class Mesher:
 		P = self.points.getHighestPoint()
 		# its closest point too
 		Q = self.points.closestPointTo(P, requiresDifferent=True)
-		
-		# we now have to find R which minimizes distance(R, P)+distance(Q, P)
-		pVoxel = self.points.voxelIndexForPoint(P)
-		qVoxel = self.points.voxelIndexForPoint(Q)
 
-		print P, Q
+		# we now have to find R which minimizes distance(R, P)+distance(Q, P)
+		R = self.points.closestPointToEdge(P,Q)
+
+		print P, Q, R
 
 
 
