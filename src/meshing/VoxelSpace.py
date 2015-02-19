@@ -212,9 +212,10 @@ class VoxelSpace:
 
 		# didn't find any point, start looking in layers around region
 		if not res:
-			print "did not find point in region"
+			print "did not find point in region defined by", aVoxel, "and", bVoxel
 			layer = 1
 			while layer<distanceLimit and not res:
+				print layer, self.voxelsAroundRegion(aVoxel, bVoxel, layer)
 				for point in self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer)):
 					print "checking for", point
 					distance = point.distance(a)+point.distance(b)
