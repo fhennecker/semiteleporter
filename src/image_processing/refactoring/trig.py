@@ -13,7 +13,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 class Arduino:
-    def __init__(self, port, isActive):
+    def __init__(self, port, isActive=True):
         """ Create a new Arduino object
         port = the serial port for the arduino
         """
@@ -21,15 +21,35 @@ class Arduino:
         self.isActive = isActive
         try:
             self.serialPort = serial.Serial(port, 115200)
-            logging.debug("Handshaking with Arduino...")
             sleep(2)
+            self.command('P')
+            logging.debug("Handshaking with Arduino...")
         except:
             logging.warning("\033[93m No arduino connected / bad serial port.. \033[0m")
 
     def command(self, cmd):
-        #FIXME better way to do that
+        #FIXME why arduino fails to response sometimes ?
+        response = ''
         if(self.isActive):
-            self.serialPort.write(cmd)
+            try:
+                self.serialPort.write(cmd)
+                while(response == ''):
+                    response = self.serialPort.read(3)
+            except:
+                logging.error("\033[93m Impossible to send the command to the arduino.. \033[0m")
+
+        return response
+
+    def debugMode(self):
+        cmd = raw_input('command : ')
+        while(cmd not in ('q','quit','e','exit')):
+            response = self.command(cmd)
+            print("Response : %s" %response)
+            cmd = raw_input('command : ')
+
+    def __del__(self):
+        print("dead")
+        self.command('m')
 
 
 
@@ -61,27 +81,28 @@ class Laser:
 
 
 class Camera:
-    def __init__(self, shape, position, rotation, viewAngle, pictureDirectory=""):
+    def __init__(self, port, shape, position, rotation, viewAngle, save, processDirectory=None):
         """ Create a new Camera object
+        port      = path to the camera
         shape     = (W,H), camera shape Width x Heigth
         position  = [X, Y, Z], camera position
         rotation  = [Rx, Ry, Rz], rotation order (Y->X'->Z")
         viewAngle = <angle>, view angle in degree
-        pictureDirectory = path to the directory of pictures to process (when don't use the scanner)
+        save      = tuple (path where save pictures, extension) or None
+        processDirectory = path to the directory of pictures to process (when don't use the scanner)
         """
 
-        logging.debug("Create Camera (%.2f, %.2f) @ %s, viewAngle = %.2f, rotation = %s" %(shape[0], shape[1], position, viewAngle, rotation))
+        logging.debug("Create Camera (%.2f, %.2f) %s @ %s, viewAngle = %.2f, rotation = %s" %(shape[0], shape[1], port, position, viewAngle, rotation))
 
+        self.camId     = port[-1]
         self.shape     = shape
         self.position  = np.array(position, dtype=np.float64)
         self.distance  = (shape[0]/2)/np.tan(np.radians(viewAngle)/2)
         self.viewAngle = viewAngle
         self.rotation  = np.radians(np.array(rotation, dtype=np.float64))
-        self.pictures  = []
-
-        if(pictureDirectory != ""):
-            self.pictures = [os.path.join(pictureDirectory, f) for f in os.listdir(pictureDirectory)]
-            self.pictures.sort()
+        self.save      = save
+        self.processDirectory = processDirectory
+        self.buffered  = ("", None)
 
         # First Rotate around Y/vertical axis
         self.rotationMatrix = np.matrix([[np.cos(rotation[1]), 0, -np.sin(rotation[1])],
@@ -96,17 +117,30 @@ class Camera:
                                           [np.sin(rotation[2]),  np.cos(rotation[2]), 0],
                                           [0                  ,  0                  , 1]])
 
-    def getPicture(self):
+    def getPicture(self, name, toBuffer=False):
         picture = None;
 
-        if(len(self.pictures) == 0):
+        if(self.processDirectory == None):
             logging.debug('Taking a picture')
-            #FIXME control the camera to take a picture here
-            pass
+ 
+            if(self.buffered[0] == name):
+                picture = self.buffered[1]
+            else:
+                cam = cv2.VideoCapture(self.camId)
+                cam.set(3, self.shape[0])
+                cam.set(4, self.shape[1])
+                ok, picture = cam.read()
+                cam.release()
+                if not ok:
+                    logging.error("impossible to get a picture from the camera..")
+                elif(self.save != None):
+                    cv2.imwrite(os.path.join(self.save[0],name+self.save[1]), picture)
+  
+            if(toBuffer):
+                self.buffered = (name, np.copy(picture))
         else:
             logging.debug('Reading a picture')
-            self.pictures.append(self.pictures[0])
-            picture = cv2.imread(self.pictures.pop(0))
+            picture = cv2.imread(os.path.join(self.processDirectory, name+self.save[1]))
 
         return picture
 
@@ -143,12 +177,14 @@ class TurnTable:
         
 
 class Scene:
-    def __init__(self, camera, laser, turntable):
+    def __init__(self, name, camera, laser, turntable):
         """ Create a new scene object
+        name   = the name of the scene for pictures names
         camera = the camera object of the scene
         laser  = the laser object of the scene (only on by scene)
         table  = the turntable object of the scene
         """
+        self.name       = name
         self.camera     = camera
         self.laser      = laser
         self.turntable  = turntable
@@ -162,9 +198,10 @@ class Scene:
 
     def calibration(self):
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture()
+        imgLaserOn = self.camera.getPicture("calibration_0")
+        print(imgLaserOn)
         self.laser.switch(False)
-        imgLaserOff = self.camera.getPicture()
+        imgLaserOff = self.camera.getPicture("calibration_1")
 
         self.calibMask = self.imageProcessor.substract(imgLaserOn, imgLaserOff)
         self.calibMask = self.imageProcessor.filterNoise(self.calibMask)
@@ -205,10 +242,13 @@ class Scene:
         return worldPoints
 
     def runStep(self, step, isLastStep):
+        name = ("%3d_%s" %(step, self.name)).replace(' ','0')
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture()#*self.calibMask
+        imgLaserOn = self.camera.getPicture(name, False)#*self.calibMask
+
+        name = ("%3d_%s" %(step, "off")).replace(' ','0')
         self.laser.switch(False)
-        imgLaserOff = self.camera.getPicture()
+        imgLaserOff = self.camera.getPicture(name, True)
 
         self.pipeline.feed((imgLaserOn, imgLaserOff, step))
         if(isLastStep):
@@ -272,6 +312,7 @@ class PipelineStage(multiprocessing.Process):
             try:
                 nbrOfArgs = len(inspect.getargspec(self.method).args)-1
                 res = (self.method(*args[:nbrOfArgs]),)+args[nbrOfArgs:]
+                logging.info("Process '%s' put a result" %(self.method.__name__))
                 self.out_queue.put(res)
             except:
                 logging.error("Bad args format in PipelineStage '%s'" %(self.method.__name__))
@@ -397,14 +438,14 @@ class Scanner3D(Tkinter.Tk):
         args = arguments passed in the command line
         """
         self.config     = Config()
-        self.laserLeft  = None
         self.sceneLeft  = None
-        self.laserRight = None
         self.sceneRight = None
         self.turntable  = None
-        self.gui        = Gui(self)
+        self.arduino    = None
+        self.gui        = None
         self.directory  = ""
         self.logLevel   = logging.WARNING
+        self.thread     = threading.Thread(target=self.startScan, args=(False,))
     
         self.parseArgv(args)
 
@@ -444,19 +485,20 @@ class Scanner3D(Tkinter.Tk):
             elif(o in ("-p", "--processing")):
                 self.directory = a
             elif(o in ("-a", "--arduino")):
-                #TODO direct communication with arduino
-                pass
+                self.arduino = Arduino(a)
             else:
                 assert False, "Unknown option"
 
 
     def loadConfig(self):
 
-        camera = Camera((self.config['Camera']['width'], self.config['Camera']['height']),
-                         self.config['Camera']['position'],
-                         self.config['Camera']['rotation'],
-                         self.config['Camera']['viewangle'],
-                         self.directory)
+        camera = Camera(self.config['Camera']['port'],
+                        (self.config['Camera']['width'], self.config['Camera']['height']),
+                        self.config['Camera']['position'],
+                        self.config['Camera']['rotation'],
+                        self.config['Camera']['viewangle'],
+                        (self.config['File']['save'], self.config['File']['extension']),
+                        self.directory)
 
         arduino = Arduino(self.config['Arduino']['port'],
                           True if (self.directory == "") else False)
@@ -468,48 +510,55 @@ class Scanner3D(Tkinter.Tk):
 
         # Assume that Laser point to the center of the turntable
         pos = self.config['LaserRight']['position']
-        self.laserRight = Laser(self.config['LaserRight']['pin'],
+        laserRight = Laser(self.config['LaserRight']['pin'],
                            pos,
                            np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
                            arduino)
-        self.sceneRight = Scene(camera, self.laserRight, self.turntable)
+        self.sceneRight = Scene("right", camera, laserRight, self.turntable)
 
         pos = self.config['LaserLeft']['position']
-        self.laserLeft = Laser(self.config['LaserLeft']['pin'],
+        laserLeft = Laser(self.config['LaserLeft']['pin'],
                           pos,
                           np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
                           arduino)
-        self.sceneLeft  = Scene(camera, self.laserLeft,  self.turntable)    
+        self.sceneLeft  = Scene("left", camera, laserLeft,  self.turntable)    
 
 
     def run(self):
-        self.gui.run()
-
-    def startScan(self):
-        self.loadConfig()
-        logging.info('\t\033[92m----- Start scanning -----\033[0m')
-
-        logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
-        if(self.gui == None):
-            raw_input('')
+        if(self.arduino != None):
+            self.arduino.debugMode()
         else:
-            self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
-        self.sceneLeft.calibration()
-        self.sceneRight.calibration()
-        logging.info('\033[94m Calibration : done, place your object on the table and press ENTER...\033[0m')
-        if(self.gui == None):
-            raw_input('')
-        else:
-            self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
+            self.gui = Gui(self)
+            self.gui.run()
 
-        self.gui.startPlot()
-        for step in range(self.turntable.nSteps):
-            self.sceneLeft.runStep(step, True if(step==self.turntable.nSteps-1) else False)
-            self.sceneRight.runStep(step, True if(step==self.turntable.nSteps-1) else False)
-            self.turntable.rotate()
-            logging.info('Step %d done', step+1)
+    def startScan(self, startThread=True):
+        if(not self.thread.isAlive()):
+            self.loadConfig()
+            logging.info('\t\033[92m----- Start scanning -----\033[0m')
 
-        logging.info('\033[92m Scanning DONE \033[0m')
+            logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
+            if(self.gui == None):
+                raw_input('')
+            else:
+                self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
+            self.sceneLeft.calibration()
+            self.sceneRight.calibration()
+            logging.info('\033[94m Calibration : done, place your object on the table and press ENTER...\033[0m')
+            if(self.gui == None):
+                raw_input('')
+            else:
+                self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
+
+            self.thread = threading.Thread(target=self.startScan, args=(False,))
+            self.thread.start()
+        elif(not startThread):
+            for step in range(self.turntable.nSteps):
+                self.sceneLeft.runStep(step, True if(step==self.turntable.nSteps-1) else False)
+                self.sceneRight.runStep(step, True if(step==self.turntable.nSteps-1) else False)
+                self.turntable.rotate()
+                logging.info('Step %d done', step+1)
+
+            logging.info('\033[92m Scanning DONE \033[0m')
 
 
 #---------------------------------------------------------
@@ -604,10 +653,11 @@ class SetupTab(Tab):
                 if(type(res) == list):
                     res = [res[0].get(),res[1].get(),res[2].get()]
                     self.config[section][option] = np.array(res, dtype=np.float64)
-                elif(res.get().isdigit()):
-                    self.config[section][option] = float(res.get())
                 else:
-                    self.config[section][option] = res.get()
+                    try:
+                        self.config[section][option] = float(res.get())
+                    except:
+                        self.config[section][option] = res.get()
 
     def saveConfigFile(self):
         ext = None
@@ -652,19 +702,19 @@ class ViewerTab(Tab):
     def createOptions(self):
         frame = Tkinter.LabelFrame(self, text="Options", font=("bold"))
         frame.grid(row=0, column=1)
-        Tkinter.Button(frame, text="Start", command=self.scanner.startScan).grid(row=0, column=0)
+        Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=0)
 
-    def plot(self, startThread=True):
-        if(startThread):
-            self.createGraph(False)
-            logging.info("Start plotting thread")
-            thread = threading.Thread(target=self.plot, args=(False,))
-            thread.start()
-        else:
-            for item_left, item_right in zip(self.scanner.sceneLeft, self.scanner.sceneRight):
-                points = np.array(item_left + item_right).T
-                self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
-                self.graph.draw()
+    def start(self):
+        self.scanner.startScan()
+        self.plot()
+
+    def plot(self):
+        self.createGraph(False)
+        logging.info("Start plotting")
+        for item_left, item_right in zip(self.scanner.sceneLeft, self.scanner.sceneRight):
+            points = np.array(item_left + item_right).T
+            self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+            self.graph.draw()
 
 
 
@@ -687,9 +737,6 @@ class Gui(Tkinter.Tk):
     def popUpConfirm(self, title, info):
         tkMessageBox.showinfo(title, info)
         self.update()
-
-    def startPlot(self):
-        self.viewerTab.plot()
 
     def run(self):
         self.mainloop()
