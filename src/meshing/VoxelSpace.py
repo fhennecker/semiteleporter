@@ -137,8 +137,25 @@ class VoxelSpace:
 		# Return only non-empty
 		return list(set(filter(self.voxels.get, voxels)))
 
-	def voxelsInCube(self, cornerA, cornerB):
-		""" Returns all voxels within the cube defined by the two corners in argument"""
+	def voxelsAroundRegion(self, cornerA, cornerB, layerSize=1):
+		def rangeBuilder(a, b, extension):
+			if a < b :
+				return range(a-extension, b+extension+1)
+			else:
+				return range(b-extension, a+extension+1)
+		# getting whole cube
+		voxels = combine(rangeBuilder(cornerA[0], cornerB[0], layerSize), \
+						rangeBuilder(cornerA[1], cornerB[1], layerSize), \
+						rangeBuilder(cornerA[1], cornerB[1], layerSize))
+
+		voxels = filter(self.voxels.get, voxels)
+		# removing center
+		toRemove = self.voxelsInRegion(cornerA, cornerB)
+		return filter(self.voxels.get, [x for x in voxels if x not in toRemove])
+
+	def voxelsInRegion(self, cornerA, cornerB):
+		""" Returns all voxels within the parallelepipedic 
+			region defined by the two corners in argument """
 		def rangeBuilder(a, b):
 			if a < b :
 				return range(a, b+1)
@@ -207,6 +224,8 @@ def test_partition():
 	expected = set(flatten(space.voxels.values())) ^ set(space.voxels[(0,0,0)])
 	assert got == expected
 
+	assert space.voxelsAroundRegion((0,0,0), (1,1,1)) == [(-1, -1, -1)]
+
 def test_closestPointTo():
 	points = VoxelSpace(10)
 	points.addPoints([(0, 0, 9), (0, 0, 11), (0, 0, 0)])
@@ -218,10 +237,10 @@ def test_closestPointTo():
 	assert points.closestPointTo(Point(0, 0, 10)) in [(0, 0, 9), (0, 0, 11)]
 	assert points.closestPointTo(Point(1000,1000,1000)) is None, "Point too far"
 
-def test_voxelsInCube():
+def test_voxelsInRegion():
 	points = VoxelSpace(10)
 	points.addPoints([(0, 0, 0), (10, 0, 0), (0, 10, 0), (10, 10, 10)])
-	voxels = points.voxelsInCube((1, 1, 1), (0,0,0))
+	voxels = points.voxelsInRegion((1, 1, 1), (0,0,0))
 	assert len(voxels) == 4
 	assert (0,0,0) in voxels
 	assert (1,0,0) in voxels
@@ -233,4 +252,4 @@ if __name__ == "__main__":
 	test_combine()
 	test_partition()
 	test_closestPointTo()
-	test_voxelsInCube()
+	test_voxelsInRegion()
