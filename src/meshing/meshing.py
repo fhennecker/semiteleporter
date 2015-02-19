@@ -14,6 +14,8 @@ class Mesher:
 	def __init__(self, voxelSpace):
 		self.points = voxelSpace
 		self.findSeedTriangle()
+		for line in self.points.getSortedPoints():
+			print line
 
 	def findSeedTriangle(self):
 		""" Builds the first triangle PQR in order to start region growing """

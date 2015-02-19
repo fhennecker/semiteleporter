@@ -193,6 +193,10 @@ class VoxelSpace:
 	def getHighestPoint(self):
 		return self.highestPoint
 
+	def getSortedPoints(self):
+		return sorted(self.allPoints(), key=lambda x: x.index)
+		
+
 def test_flatten():
 	assert flatten([[1, 2], [3, 4]]) == [1, 2, 3, 4]
 
