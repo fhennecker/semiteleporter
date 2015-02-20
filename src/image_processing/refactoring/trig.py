@@ -359,7 +359,7 @@ class Pipeline:
 
 
 class PipeMerge:
-    def __init__(self, pipelines):
+    def __init__(self, *pipelines):
         self.pipelines = pipelines
 
     def get_first(self):
@@ -750,7 +750,7 @@ class ViewerTab(Tab):
     def plot(self):
         self.createGraph(False)
         logging.info("Start plotting")
-        for item_left, item_right in PipeMerge(self.scanner.sceneLeft, self.scanner.sceneRight).get_all():
+        for item_left, item_right in PipeMerge(self.scanner.sceneLeft.pipeline, self.scanner.sceneRight.pipeline).get_all():
             points = np.array(item_left + item_right).T
             if(len(points) != 0):
                 self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
