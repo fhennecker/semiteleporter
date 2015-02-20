@@ -358,6 +358,45 @@ class Pipeline:
         self.feed(EndOfProcessing)
 
 
+class PipeMerge:
+    def __init__(self, pipelines):
+        self.pipelines = pipelines
+
+    def get_first(self):
+        """
+        Yield the first available element from any pipeline.
+        """
+        while len(self.pipelines) > 0:
+            availables = map(lambda p: not p.out_queue.empty(), self.pipelines)
+            removed = 0
+            for idx, avail in enumerate(availables):
+                i = idx - removed
+                if avail:
+                    got = self.pipelines[i].out_queue.get()
+                    if got == EndOfProcessing:
+                        del self.pipelines[i]
+                        removed += 1
+                    else:
+                        yield got
+
+    def get_all(self):
+        """
+        Yields the output of all pipelines in a vector, once an entire one is
+        available.
+        """
+        while len(self.pipelines) > 0:
+            while True in map(lambda p: not p.out_queue.empty(), self.pipelines):
+                pass
+            got = map(lambda p: p.out_queue.get(), self.pipelines)
+            removed = 0
+            for idx, item in enumerate(got):
+                i = idx - removed
+                if item == EndOfProcessing:
+                    del self.pipelines[i]
+                    removed += 1
+            yield filter(lambda x: x != EndOfProcessing, got)
+
+
 class Config:
     def __init__(self, configFile=""):
         """ Create a new Config object
@@ -711,7 +750,7 @@ class ViewerTab(Tab):
     def plot(self):
         self.createGraph(False)
         logging.info("Start plotting")
-        for item_left, item_right in zip(self.scanner.sceneLeft, self.scanner.sceneRight):
+        for item_left, item_right in PipeMerge(self.scanner.sceneLeft, self.scanner.sceneRight).get_all():
             points = np.array(item_left + item_right).T
             self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
             self.graph.draw()
