@@ -47,10 +47,6 @@ class Arduino:
             print("Response : %s" %response)
             cmd = raw_input('command : ')
 
-    def __del__(self):
-        print("dead")
-        self.command('m')
-
 
 
 class Laser:
@@ -94,7 +90,7 @@ class Camera:
 
         logging.debug("Create Camera (%.2f, %.2f) %s @ %s, viewAngle = %.2f, rotation = %s" %(shape[0], shape[1], port, position, viewAngle, rotation))
 
-        self.camId     = port[-1]
+        self.camId     = int(port[-1])
         self.shape     = shape
         self.position  = np.array(position, dtype=np.float64)
         self.distance  = (shape[0]/2)/np.tan(np.radians(viewAngle)/2)
@@ -117,9 +113,13 @@ class Camera:
                                           [np.sin(rotation[2]),  np.cos(rotation[2]), 0],
                                           [0                  ,  0                  , 1]])
 
+        if(self.save != None and not os.path.exists(self.save[0])):
+            logging.debug("Creating %s directory for pictures" %(self.save[0]))
+            os.makedirs(self.save[0])
+
+
     def getPicture(self, name, toBuffer=False):
         picture = None;
-
         if(self.processDirectory == None):
             logging.debug('Taking a picture')
  
@@ -198,13 +198,13 @@ class Scene:
 
     def calibration(self):
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture("calibration_0")
-        print(imgLaserOn)
+        imgLaserOn = self.camera.getPicture("calibration_0_"+self.name)
         self.laser.switch(False)
-        imgLaserOff = self.camera.getPicture("calibration_1")
+        imgLaserOff = self.camera.getPicture("calibration_1_"+self.name)
 
         self.calibMask = self.imageProcessor.substract(imgLaserOn, imgLaserOff)
         self.calibMask = self.imageProcessor.filterNoise(self.calibMask)
+        cv2.imwrite("./pictures/mask_"+self.name+".png", self.calibMask)
         self.calibMask = (self.calibMask-1)/255
 
     def getWorldPoint(self, cameraPoints, step):
@@ -242,11 +242,11 @@ class Scene:
         return worldPoints
 
     def runStep(self, step, isLastStep):
-        name = ("%3d_%s" %(step, self.name)).replace(' ','0')
+        name = ("%d_%s" %(step, self.name))
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture(name, False)#*self.calibMask
+        imgLaserOn = self.camera.getPicture(name, False)*self.calibMask
 
-        name = ("%3d_%s" %(step, "off")).replace(' ','0')
+        name = ("%d_%s" %(step, "off"))
         self.laser.switch(False)
         imgLaserOff = self.camera.getPicture(name, True)
 
@@ -443,7 +443,7 @@ class Scanner3D(Tkinter.Tk):
         self.turntable  = None
         self.arduino    = None
         self.gui        = None
-        self.directory  = ""
+        self.directory  = None
         self.logLevel   = logging.WARNING
         self.thread     = threading.Thread(target=self.startScan, args=(False,))
     
@@ -501,7 +501,7 @@ class Scanner3D(Tkinter.Tk):
                         self.directory)
 
         arduino = Arduino(self.config['Arduino']['port'],
-                          True if (self.directory == "") else False)
+                          True if (self.directory == None) else False)
 
         self.turntable = TurnTable(self.config['TurnTable']['position'],
                                    self.config['TurnTable']['diameter'],
@@ -713,8 +713,9 @@ class ViewerTab(Tab):
         logging.info("Start plotting")
         for item_left, item_right in zip(self.scanner.sceneLeft, self.scanner.sceneRight):
             points = np.array(item_left + item_right).T
-            self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
-            self.graph.draw()
+            if(len(points) != 0):
+                self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+                self.graph.draw()
 
 
 
