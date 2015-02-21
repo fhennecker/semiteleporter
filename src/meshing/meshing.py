@@ -21,13 +21,25 @@ class Mesher:
 		self.points = voxelSpace
 		self.activeEdges = Queue.Queue()
 		self.existingEdges = {}
-		self.faces = []
+		self.faces = set()
 		self.findSeedTriangle()
 		try:
 			self.growRegion()
 		except:
 			traceback.print_exc()
 		self.writeToObj("test.obj")
+
+	def hasFace(self, p1, p2, p3):
+		return (p1, p2, p3) in self.faces or\
+		       (p2, p3, p1) in self.faces or\
+		       (p3, p1, p2) in self.faces or\
+		       (p3, p2, p1) in self.faces or\
+		       (p2, p1, p3) in self.faces or\
+		       (p1, p3, p2) in self.faces
+
+	def hasEdge(self, fromPoint, toPoint):
+		"""Return true if there is an edge between fromPoint and toPoint"""
+		return fromPoint in self.existingEdges and toPoint in self.existingEdges[fromPoint]
 
 	def setEdge(self, point, *otherPoints):
 		existing = self.existingEdges.get(point, set())
@@ -52,7 +64,7 @@ class Mesher:
 		# we now have to find R which minimizes distance(R, P)+distance(Q, P)
 		R = self.points.closestPointToEdge(P,Q)
 
-		self.faces.append((P, Q, R))
+		self.faces.add((P, Q, R))
 
 		# enqueing the seed triangle's edges
 		self.activeEdges.put((P, Q))
@@ -102,12 +114,16 @@ class Mesher:
 		ka = a-Pk # k->a vector positioned at origin
 		kb = b-Pk # k->b vector positioned at origin
 		N = np.cross(ka, kb)
+		# N /= np.linalg.norm(N) # normalize
 
-		# build influence region
+		# find edge side direction
 		n5 = np.cross(kb-ka, N)
+		n5 /= np.linalg.norm(n5) # normalize
+
 		# TODO check direction of n5 when Mr. Procrastination and Ms. Too Late are gone
-		aa = a+s*n5/np.linalg.norm(n5)
-		bb = b+s*n5/np.linalg.norm(n5)
+		aa = a + s*n5
+		bb = b + s*n5
+		
 		# aa, bb is the the (a, b) transposed on the parallel plane which delimits
 		# the influence region. It helps us compute the two other corners of the region
 		l, m, q = np.linalg.solve(np.array([bb-aa, b-P, N]).transpose(), P-aa)
@@ -116,7 +132,6 @@ class Mesher:
 		aaa = bb + l*(aa-bb)
 
 		res = [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
-		print aaa, bbb
 		with open("degueu.obj", 'w') as lalala:
 			for hello in [a, b, Pk]:
 				print>> lalala, "v %f %f %f 1 0 0" % tuple(hello)
@@ -129,33 +144,49 @@ class Mesher:
 			print>> lalala, "f 5 8 9"
 
 		# we now have to add/subtract N to these points to get the real corners
-		return [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
+		return res
 
 	def growRegion(self):
 		while not self.activeEdges.empty():
 			a, b = self.activeEdges.get()
-			print a, b
+			print "Find triangle from edge", repr(a), repr(b)
 			regionPoints = self.influenceRegion(a,b)
 			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
 			maxCoords = Point(*[max(map(lambda x:x[i], regionPoints)) for i in range(3)])
 			minVoxel = self.points.voxelIndexForPoint(minCoords)
 			maxVoxel = self.points.voxelIndexForPoint(maxCoords)
 			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
-			eligiblePoints = self.points.pointsInVoxels(voxelsToLookup)
 
+			elligible = lambda p: p not in (a, b)
+			eligiblePoints = filter(elligible, self.points.pointsInVoxels(voxelsToLookup))
 
-			distanceToEdge = lambda ep: np.linalg.norm((ep-a).toNPArray()) + np.linalg.norm((ep-b).toNPArray())
-			eps = sorted(filter(lambda ep: ep not in [a, b], eligiblePoints), key=distanceToEdge)
-			if len(eps) > 0 :
-				newPoint = eps[0]
+			distanceToEdge = lambda p: np.linalg.norm((p-a).toNPArray()) + np.linalg.norm((p-b).toNPArray())
+			eps = sorted(eligiblePoints, key=distanceToEdge)
 
-				self.faces.append((a, b, newPoint))
-				self.activeEdges.put((newPoint, a))
-				self.activeEdges.put((newPoint, b))
+			for newPoint in eps:
+				if self.hasFace(newPoint, a, b):
+					continue
+				print "Add face", repr(a), repr(b), repr(newPoint)
+				if not self.hasEdge(newPoint, a):
+					self.activeEdges.put((newPoint, a))
+				else: 
+					print "Already has edge", repr(newPoint), repr(a)
+				if not self.hasEdge(newPoint, b):
+					self.activeEdges.put((b, newPoint))
+				else:
+					print "Already has edge", repr(newPoint), repr(b)
 				self.setEdge(newPoint, a, b)
+				self.faces.add((newPoint, a, b))
+				break
+			print "--------------------------------"
+		print "\033[1mHave %d faces\033[0m" % (len(self.faces))
+		print self.existingEdges
 
-op = ObjParser("icoSphere.obj")
-vs = VoxelSpace(1)
-vs.addPoints(op.points)
-print vs
-mesher = Mesher(vs)
+if __name__ == "__main__":
+	from sys import argv
+
+	op = ObjParser(argv[1] if len(argv) > 1 else "icoSphere.obj")
+	vs = VoxelSpace(1)
+	vs.addPoints(op.points)
+	print vs
+	mesher = Mesher(vs)

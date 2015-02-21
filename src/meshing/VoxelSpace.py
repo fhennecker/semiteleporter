@@ -25,6 +25,9 @@ class Point:
 	def __str__(self):
 		return "Point<"+str(self.x)+", "+str(self.y)+", "+str(self.z)+", #"+str(self.index)+">"
 
+	def __repr__(self):
+		return "#" + str(self.index)
+
 	def __eq__(self, other):
 		res = False
 		if isinstance(other, tuple) or isinstance(other, list) and len(other) == 3:
@@ -212,7 +215,7 @@ class VoxelSpace:
 		bestDistance = float("inf")
 
 		for point in self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel)):
-			print "checking for", point
+			# print "checking for", point
 			if point != a and point != b:
 				distance = point.distance(a)+point.distance(b)
 				if distance < bestDistance:
