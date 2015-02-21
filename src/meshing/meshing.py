@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from VoxelSpace import VoxelSpace, flatten, Point
 from math import sqrt
 import Queue
@@ -15,11 +18,14 @@ class ObjParser:
 class Mesher:
 	def __init__(self, voxelSpace):
 		self.points = voxelSpace
-		self.activeEdges = Queue()
+		self.activeEdges = Queue.Queue()
 		self.existingEdges = {}
 		self.faces = []
 		self.findSeedTriangle()
-		self.growRegion()
+		try:
+			self.growRegion()
+		except:
+			pass
 		self.writeToObj("test.obj")
 
 
@@ -27,7 +33,8 @@ class Mesher:
 		with open(filename, 'w') as obj:
 			for point in self.points.getSortedPoints():
 				obj.write("v "+str(point.x)+" "+str(point.y)+" "+str(point.z)+"\n")
-			obj.write("f "+str(self.P.index)+" "+str(self.Q.index)+" "+str(self.R.index)+"\n")
+			for face in self.faces :
+				obj.write("f "+str(face[0].index)+" "+str(face[1].index)+" "+str(face[2].index)+"\n")
 
 
 	def findSeedTriangle(self):
@@ -39,69 +46,108 @@ class Mesher:
 		# we now have to find R which minimizes distance(R, P)+distance(Q, P)
 		R = self.points.closestPointToEdge(P,Q)
 
-		self.faces.append((P.index, Q.index, R.index))
+		self.faces.append((P, Q, R))
 
 		# enqueing the seed triangle's edges
-		self.activeEdges.put((P.index, Q.index), (P.index, R.index), (Q.index, R.index))
+		self.activeEdges.put((P, Q), (P, R), (Q, R))
 		self.existingEdges[P] = [Q, R]
 		self.existingEdges[Q] = [P, R]
 		self.existingEdges[R] = [Q, P]
 
 	def longestEdgeLength(self, point):
 		""" Returns the length of the longest edge adjacent to a point """
-		res = 0
-		if point in self.existingEdges:
-			res = max(map(lambda x:point.distance(x)), self.existingEdges[point])
+		res = max(map(point.distance, self.existingEdges[point]))
 		return res
 
 	def shortestEdgeLength(self, point):
 		""" Returns the length of the shortest edge adjacent to a point """
-		res = float("inf")
-		if point in self.existingEdges:
-			res = min(map(lambda x:point.distance(x)), self.existingEdges[point])
+		res = min(map(point.distance, self.existingEdges[point]))
 		return res
 
 	def samplingUniformityDegree(self, point):
 		""" Returns the sampling uniformity degree of a point already part of a face.
 			The SUD of a point is the ratio between its longest and shortest adjacent edges. """
-		res = None
-		if point in self.existingEdges :
-			res = self.longestEdgeLength(point)/self.shortestEdgeLength(point)
+		res = self.longestEdgeLength(point)/self.shortestEdgeLength(point)
 		return res
 
 	def minEdgeAverage(self, a, b):
 		""" Computes the average length of point a and b's shorter adjacent edges """
-		res = None
-		if point in self.existingEdges:
-			res = float(self.shortestEdgeLength(a)+self.shortestEdgeLength(b))/2
+		res = float(self.shortestEdgeLength(a)+self.shortestEdgeLength(b))/2
 		return res
 
-	def influenceRegion(self, a, b):
-		""" Computes the influence region of the edge a, b """
+	def influenceRegion(self, aPoint, bPoint):
+		""" Returns a list of the corners of the influence region """
 		# helper : see CADreconstruction.pdf - H.-W. Lin et al. for notations
-		s = max(self.samplingUniformityDegree(a), self.samplingUniformityDegree(b))
-		s *= self.minEdgeAverage(a, b)
+		s = max(self.samplingUniformityDegree(aPoint), self.samplingUniformityDegree(bPoint))
+		s *= self.minEdgeAverage(aPoint, bPoint)
+
+		a, b = aPoint.toNPArray(), bPoint.toNPArray()
 
 		# midpoint of (a,b)
-		Pm = Point((a.x+b.x)/2, (a.y+b.y)/2, (a.z+b.z)/2)
+		Pm = (a+b)/2
 		# third point of the triangle adjacent to a, b
-		Pk = [x for x in self.existingEdges[a] if x in self.existingEdges[b]][0]
+		PkPoint = [x for x in self.existingEdges[aPoint] if x in self.existingEdges[bPoint]][0]
+		Pk = PkPoint.toNPArray()
 		# barycenter of the triangle
-		P = Point((a.x+b.x+Pk.x)/3, (a.y+b.y+Pk.y)/3, (a.z+b.z+Pk.z)/3)
+		P = (a+b+Pk)/3
 
-		# compute normal for a, b, Pk
+		# compute normal for triangle (a, b, Pk)”
 		ka = a-Pk # k->a vector positioned at origin
 		kb = b-Pk # k->b vector positioned at origin
-		N = np.cross(ka.toNPArray(), kb.toNPArray())
+		N = np.cross(ka, kb)
 
 		# build influence region
-		# TODO
+		n5 = np.cross(kb-ka, N)
+		# TODO check direction of n5 when Mr. Procrastination and Ms. Too Late are gone
+		aa = a+n5
+		bb = b+n5
+		# aa, bb is the the (a, b) transposed on the parallel plane which delimits
+		# the influence region. It helps us compute the two other corners of the region
+		l, m, q = np.linalg.solve(np.array([bb-aa, b-P, N]).transpose(), P-aa)
+		bbb = aa + l*(bb-aa)
+		l, m, q = np.linalg.solve(np.array([aa-bb, a-P, N]).transpose(), P-bb)
+		aaa = bb + l*(aa-bb)
+
+		res = [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
+		print aaa, bbb
+		with open("degueu.obj", 'w') as lalala:
+			for hello in [a, b, Pk]:
+				print>> lalala, "v %f %f %f 1 0 0" % tuple(hello)
+			for bonjour in res:
+				print>> lalala, "v %f %f %f 0 1 1" % tuple(bonjour)
+			print>> lalala, "f 1 2 3"
+			print>> lalala, "f 5 4 6"
+			print>> lalala, "f 7 5 6"
+			print>> lalala, "f 5 4 8"
+			print>> lalala, "f 9 8 5"
+
+		# we now have to add/subtract N to these points to get the real corners
+		return [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
 
 	def growRegion(self):
 		while not self.activeEdges.empty():
 			a, b = self.activeEdges.get()
-			
+			print a, b
+			regionPoints = self.influenceRegion(a,b)
+			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
+			maxCoords = Point(*[max(map(lambda x:x[i], regionPoints)) for i in range(3)])
+			minVoxel = self.points.voxelIndexForPoint(minCoords)
+			maxVoxel = self.points.voxelIndexForPoint(maxCoords)
+			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
+			eligiblePoints = self.points.pointsInVoxels(voxelsToLookup)
 
+
+			distanceToEdge = lambda ep: np.linalg.norm((ep-a).toNPArray()) + np.linalg.norm((ep-b).toNPArray())
+			eps = sorted(filter(lambda ep: ep not in [a, b], eligiblePoints), key=distanceToEdge)
+			if len(eps) > 0 :
+				newPoint = eps[0]
+
+				self.faces.append((a, b, newPoint))
+				self.activeEdges.put((newPoint, a))
+				self.activeEdges.put((newPoint, b))
+				self.existingEdges[a].append(newPoint)
+				self.existingEdges[b].append(newPoint)
+				self.existingEdges[newPoint] = [a, b]
 
 op = ObjParser("icoSphere.obj")
 vs = VoxelSpace(1)
