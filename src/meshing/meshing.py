@@ -99,8 +99,8 @@ class Mesher:
 		# build influence region
 		n5 = np.cross(kb-ka, N)
 		# TODO check direction of n5 when Mr. Procrastination and Ms. Too Late are gone
-		aa = a+n5
-		bb = b+n5
+		aa = a+s*n5/np.linalg.norm(n5)
+		bb = b+s*n5/np.linalg.norm(n5)
 		# aa, bb is the the (a, b) transposed on the parallel plane which delimits
 		# the influence region. It helps us compute the two other corners of the region
 		l, m, q = np.linalg.solve(np.array([bb-aa, b-P, N]).transpose(), P-aa)
