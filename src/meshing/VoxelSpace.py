@@ -41,6 +41,15 @@ class Point:
 	def __hash__(self):
 		return hash((self.x, self.y, self.z, self.index))
 
+	def __add__(self, other):
+		return Point(self.x+other.x, self.y+other.y, self.z+other.z)
+
+	def __sub__(self, other):
+		return Point(self.x-other.x, self.y-other.y, self.z-other.z)
+
+	def toNPArray(self):
+		return np.array([self.x, self.y, self.z])
+
 	def distance(self, other):
 		return sqrt((self.x-other.x)**2 + (self.y-other.y)**2 + (self.z-other.z)**2)
 
