@@ -5,6 +5,7 @@ from VoxelSpace import VoxelSpace, flatten, Point
 from math import sqrt
 import Queue
 import numpy as np
+import traceback
 
 class ObjParser:
 	def __init__(self, filename):
@@ -25,7 +26,7 @@ class Mesher:
 		try:
 			self.growRegion()
 		except:
-			pass
+			traceback.print_exc()
 		self.writeToObj("test.obj")
 
 	def setEdge(self, point, *otherPoints):
@@ -125,7 +126,7 @@ class Mesher:
 			print>> lalala, "f 5 4 6"
 			print>> lalala, "f 7 5 6"
 			print>> lalala, "f 5 4 8"
-			print>> lalala, "f 9 8 5"
+			print>> lalala, "f 5 8 9"
 
 		# we now have to add/subtract N to these points to get the real corners
 		return [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
