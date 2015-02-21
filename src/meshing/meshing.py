@@ -28,6 +28,12 @@ class Mesher:
 			pass
 		self.writeToObj("test.obj")
 
+	def setEdge(self, point, *otherPoints):
+		existing = self.existingEdges.get(point, set())
+		self.existingEdges[point] = existing.union(set(otherPoints))
+		for otherPoint in otherPoints:
+			existing = self.existingEdges.get(otherPoint, set())
+			self.existingEdges[otherPoint] = existing.union(set((point,)))
 
 	def writeToObj(self, filename):
 		with open(filename, 'w') as obj:
@@ -35,7 +41,6 @@ class Mesher:
 				obj.write("v "+str(point.x)+" "+str(point.y)+" "+str(point.z)+"\n")
 			for face in self.faces :
 				obj.write("f "+str(face[0].index)+" "+str(face[1].index)+" "+str(face[2].index)+"\n")
-
 
 	def findSeedTriangle(self):
 		""" Builds the first triangle PQR in order to start region growing """
@@ -49,10 +54,11 @@ class Mesher:
 		self.faces.append((P, Q, R))
 
 		# enqueing the seed triangle's edges
-		self.activeEdges.put((P, Q), (P, R), (Q, R))
-		self.existingEdges[P] = [Q, R]
-		self.existingEdges[Q] = [P, R]
-		self.existingEdges[R] = [Q, P]
+		self.activeEdges.put((P, Q))
+		self.activeEdges.put((P, R))
+		self.activeEdges.put((Q, R))
+		self.setEdge(P, Q, R)
+		self.setEdge(Q, R)
 
 	def longestEdgeLength(self, point):
 		""" Returns the length of the longest edge adjacent to a point """
@@ -145,9 +151,7 @@ class Mesher:
 				self.faces.append((a, b, newPoint))
 				self.activeEdges.put((newPoint, a))
 				self.activeEdges.put((newPoint, b))
-				self.existingEdges[a].append(newPoint)
-				self.existingEdges[b].append(newPoint)
-				self.existingEdges[newPoint] = [a, b]
+				self.setEdge(newPoint, a, b)
 
 op = ObjParser("icoSphere.obj")
 vs = VoxelSpace(1)
