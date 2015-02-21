@@ -59,3 +59,4 @@ target/
 *.obj
 !src/meshing/teapot.obj
 !src/meshing/teapot_pc.obj
+!src/meshing/icoSphere.obj
