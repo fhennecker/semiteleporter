@@ -49,6 +49,13 @@ class Mesher:
 			existing = self.existingEdges.get(otherPoint, set())
 			self.existingEdges[otherPoint] = existing.union(set((point,)))
 
+	def isFixedPoint(self, point):
+		""" Returns False if this point is connected to at least one active edge, True otherwise """
+		for edge in self.existingEdges[point]:
+			if tuple(point, edge) in self.activeEdges or tuple(edge, point) in self.activeEdges:
+				return False
+		return True
+
 	def writeToObj(self, filename):
 		with open(filename, 'w') as obj:
 			for point in self.points.getSortedPoints():
@@ -165,7 +172,7 @@ class Mesher:
 			eps = sorted(eligiblePoints, key=distanceToEdge)
 
 			for newPoint in eps:
-				if self.hasFace(newPoint, a, b):
+				if self.hasFace(newPoint, a, b) or self.isFixedPoint(newPoint):
 					continue
 				print "Add face", repr(a), repr(b), repr(newPoint)
 				if not self.hasEdge(newPoint, a):
