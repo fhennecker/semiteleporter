@@ -183,14 +183,15 @@ class Mesher:
 
 			if self.debug:
 				self.writeToObj("test.obj")
-				with open("degueu.obj", 'w') as lalala:
+				nPoints = len(self.points.getSortedPoints())
+				with open("test.obj", 'a') as lalala:
 					for bonjour in regionPoints:
 						print>> lalala, "v %f %f %f 0 1 1" % tuple(bonjour)
-					print>> lalala, "f 2 1 3"
-					print>> lalala, "f 4 2 3"
-					print>> lalala, "f 2 1 5"
-					print>> lalala, "f 2 5 6"
-				x = raw_input()
+					print>> lalala, "f %d %d %d" % (2+nPoints, 1+nPoints, 3+nPoints,)
+					print>> lalala, "f %d %d %d" % (4+nPoints, 2+nPoints, 3+nPoints,)
+					print>> lalala, "f %d %d %d" % (2+nPoints, 1+nPoints, 5+nPoints,)
+					print>> lalala, "f %d %d %d" % (2+nPoints, 5+nPoints, 6+nPoints,)
+				x = raw_input("Reload mesh...")
 
 		print "\033[1mHave %d faces\033[0m" % (len(self.faces))
 		print self.existingEdges
