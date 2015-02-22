@@ -199,7 +199,7 @@ if __name__ == "__main__":
 	from sys import argv
 
 	op = ObjParser(argv[1] if len(argv) > 1 else "icoSphere.obj")
-	vs = VoxelSpace(20)
+	vs = VoxelSpace(int(argv[2]) if len(argv) > 2 else 1)
 	vs.addPoints(op.points)
 	print vs
 	mesher = Mesher(vs, debug=True)
