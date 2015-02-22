@@ -147,9 +147,25 @@ class Mesher:
 		# we now have to add/subtract N to these points to get the real corners
 		return res
 
+	def isInRegion(self, regionBox, point):
+		"""
+		Return true if the point is effectively in the influence region box
+		(voxels sampling might return points near the region, but outside)
+		"""
+		a, b, c, unused, d, unused2 = regionBox
+		matrix = np.array([b-a, c-a, d-a]).transpose()
+		l, m, g = np.linalg.solve(matrix, point.toNPArray()-a)
+		return 0 < l <= 1 and 0 < m and 0 < g
+
+	def isInnerEdge(self, a, b):
+		"""Return True if edge a,b belongs to 2 triangles"""
+		return len(self.existingEdges.get(a, set()) & self.existingEdges.get(b, set())) == 2
+
 	def growRegion(self):
 		while not self.activeEdges.empty():
 			a, b = self.activeEdges.get()
+			if self.isInnerEdge(a, b):
+				continue
 			print "Find triangle from edge", repr(a), repr(b)
 			regionPoints = self.influenceRegion(a,b)
 			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
@@ -165,7 +181,7 @@ class Mesher:
 			eps = sorted(eligiblePoints, key=distanceToEdge)
 
 			for newPoint in eps:
-				if self.hasFace(newPoint, a, b):
+				if self.hasFace(newPoint, a, b) or not self.isInRegion(regionPoints, newPoint):
 					continue
 				print "Add face", repr(a), repr(b), repr(newPoint)
 				if not self.hasEdge(newPoint, a):
@@ -203,4 +219,4 @@ if __name__ == "__main__":
 	vs = VoxelSpace(int(argv[2]) if len(argv) > 2 else 1)
 	vs.addPoints(op.points)
 	print vs
-	mesher = Mesher(vs, debug=True)
+	mesher = Mesher(vs, debug=(len(argv) > 3))
