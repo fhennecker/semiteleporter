@@ -183,7 +183,7 @@ class Mesher:
 
 			if self.debug:
 				self.writeToObj("test.obj")
-				nPoints = len(self.points.getSortedPoints())
+				nPoints = self.points.numberOfPoints()
 				with open("test.obj", 'a') as lalala:
 					for bonjour in regionPoints:
 						print>> lalala, "v %f %f %f 0 1 1" % tuple(bonjour)
