@@ -17,11 +17,12 @@ class ObjParser:
 
 
 class Mesher:
-	def __init__(self, voxelSpace):
+	def __init__(self, voxelSpace, debug=False):
 		self.points = voxelSpace
 		self.activeEdges = Queue.Queue()
 		self.existingEdges = {}
 		self.faces = set()
+		self.debug = debug
 		self.findSeedTriangle()
 		try:
 			self.growRegion()
@@ -179,6 +180,18 @@ class Mesher:
 				self.faces.add((newPoint, a, b))
 				break
 			print "--------------------------------"
+
+			if self.debug:
+				self.writeToObj("test.obj")
+				with open("degueu.obj", 'w') as lalala:
+					for bonjour in regionPoints:
+						print>> lalala, "v %f %f %f 0 1 1" % tuple(bonjour)
+					print>> lalala, "f 2 1 3"
+					print>> lalala, "f 4 2 3"
+					print>> lalala, "f 2 1 5"
+					print>> lalala, "f 2 5 6"
+				x = raw_input()
+
 		print "\033[1mHave %d faces\033[0m" % (len(self.faces))
 		print self.existingEdges
 
@@ -186,7 +199,7 @@ if __name__ == "__main__":
 	from sys import argv
 
 	op = ObjParser(argv[1] if len(argv) > 1 else "icoSphere.obj")
-	vs = VoxelSpace(1)
+	vs = VoxelSpace(20)
 	vs.addPoints(op.points)
 	print vs
-	mesher = Mesher(vs)
+	mesher = Mesher(vs, debug=True)
