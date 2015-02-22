@@ -5,15 +5,14 @@ def flatten(list_of_lists):
 	"""[[a, b], [c, d]] -> [a, b, c, d]"""
 	return reduce(list.__add__, list_of_lists, [])
 
-def combine(head, *tail):
+def combine(Xrange, Yrange, Zrange):
 	"""
-	Generate all possible combinations of a set of list
-	[[a, b], [c, d]] -> [(a,c), (a,d), (b,c), (b,d)]
-	(works on higher dimensions)
+	Generate all possible combinations of x,y,z
 	"""
-	if not tail:
-		return [(h,) for h in head]
-	return [(h,) + t for h in head for t in combine(tail[0], *tail[1:])]
+	for x in Xrange:
+		for y in Yrange:
+			for z in Zrange:
+				yield (x, y, z)
 
 class Point:
 	def __init__(self, x=0, y=0, z=0, index=None):
@@ -132,19 +131,19 @@ class VoxelSpace:
 		Returns a list of all voxels containing points within a hollow voxel cube.
 		"""
 		# Top and bottom planes
-		x, y = range(vx-outer+1, vx+outer), range(vy-outer+1, vy+outer)
-		voxels = combine(x, y, range(vz-outer+1, vz-inner+1))
-		voxels += combine(x, y, range(vz+inner, vz+outer))
+		x, y = xrange(vx-outer+1, vx+outer), xrange(vy-outer+1, vy+outer)
+		voxels = list(combine(x, y, xrange(vz-outer+1, vz-inner+1)))
+		voxels += list(combine(x, y, xrange(vz+inner, vz+outer)))
 
 		# Left and right planes
-		y, z = range(vy-outer+1, vy+outer), range(vz-inner+1, vz+inner)
-		voxels += combine(range(vx-outer+1, vx-inner+1), y, z)
-		voxels += combine(range(vx+inner, vx+outer), y, z)
+		y, z = xrange(vy-outer+1, vy+outer), xrange(vz-inner+1, vz+inner)
+		voxels += list(combine(xrange(vx-outer+1, vx-inner+1), y, z))
+		voxels += list(combine(xrange(vx+inner, vx+outer), y, z))
 
 		# Front and back planes
-		x, z = range(vx-inner+1, vx+inner), range(vz-inner+1, vz+inner)
-		voxels += combine(x, range(vy-outer+1, vy-inner+1), z)
-		voxels += combine(x, range(vy+inner, vy+outer), z)
+		x, z = xrange(vx-inner+1, vx+inner), xrange(vz-inner+1, vz+inner)
+		voxels += list(combine(x, xrange(vy-outer+1, vy-inner+1), z))
+		voxels += list(combine(x, xrange(vy+inner, vy+outer), z))
 
 		# Return only non-empty
 		return list(set(filter(self.voxels.get, voxels)))
@@ -155,29 +154,29 @@ class VoxelSpace:
 
 		def rangeBuilder(a, b, extension):
 			if a < b :
-				return range(a-extension, b+extension+1)
+				return xrange(a-extension, b+extension+1)
 			else:
-				return range(b-extension, a+extension+1)
-		# getting whole cube
-		voxels = combine(rangeBuilder(cornerA[0], cornerB[0], outer), \
-						rangeBuilder(cornerA[1], cornerB[1], outer), \
-						rangeBuilder(cornerA[1], cornerB[1], outer))
+				return xrange(b-extension, a+extension+1)
 
-		voxels = filter(self.voxels.get, voxels)
 		# removing center
-		toRemove = combine(rangeBuilder(cornerA[0], cornerB[0], inner-1), \
+		toRemove = set(combine(rangeBuilder(cornerA[0], cornerB[0], inner-1), \
 							rangeBuilder(cornerA[1], cornerB[1], inner-1), \
-							rangeBuilder(cornerA[1], cornerB[1], inner-1))
-		return filter(self.voxels.get, [x for x in voxels if x not in toRemove])
+							rangeBuilder(cornerA[1], cornerB[1], inner-1)))
+
+		voxels = set(combine(rangeBuilder(cornerA[0], cornerB[0], outer), \
+						rangeBuilder(cornerA[1], cornerB[1], outer), \
+						rangeBuilder(cornerA[1], cornerB[1], outer)))
+
+		return filter(self.voxels.get, voxels^toRemove)
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
 			region defined by the two corners in argument """
 		def rangeBuilder(a, b):
 			if a < b :
-				return range(a, b+1)
+				return xrange(a, b+1)
 			else:
-				return range(b, a+1)
+				return xrange(b, a+1)
 		voxels = combine(rangeBuilder(cornerA[0], cornerB[0]), \
 						rangeBuilder(cornerA[1], cornerB[1]), \
 						rangeBuilder(cornerA[2], cornerB[2]))
@@ -194,7 +193,7 @@ class VoxelSpace:
 		distance = lambda p: point.distance(p)
 		cx, cy, cz = self.voxelIndexForPoint(point)
 
-		for i in range(distanceLimit):
+		for i in xrange(distanceLimit):
 			points = self.pointsInVoxels(self.voxelsInLayer(cx, cy, cz, i, i+1))
 			# Invariant: if we find points in a layer, the nearest one is in
 			#            this list (we examine layers incrementally)
@@ -250,8 +249,6 @@ def test_flatten():
 	assert flatten([[1, 2], [3, 4]]) == [1, 2, 3, 4]
 
 def test_combine():
-	assert combine(range(2)) == [(0,), (1,)]
-	assert set(combine(range(2), range(2))) == set([(0,0), (0,1), (1,0), (1,1)])
 	c = set(combine(range(2), range(2), range(2))) 
 	s = set([(0,0,0), (0,0,1), (0,1,0), (0,1,1), (1,0,0), (1,0,1), (1,1,0), (1,1,1)])
 	assert c == s
