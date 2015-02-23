@@ -189,7 +189,6 @@ class Scene:
         self.laser      = laser
         self.turntable  = turntable
         self.imageProcessor = ImageProcessor()
-        self.calibMask  = None
         self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
                                    self.getWorldPoint)
 
@@ -202,10 +201,7 @@ class Scene:
         self.laser.switch(False)
         imgLaserOff = self.camera.getPicture("calibration_1_"+self.name)
 
-        self.calibMask = self.imageProcessor.substract(imgLaserOn, imgLaserOff)
-        self.calibMask = self.imageProcessor.filterNoise(self.calibMask)
-        cv2.imwrite("./pictures/mask_"+self.name+".png", self.calibMask)
-        self.calibMask = (self.calibMask-1)/255
+        self.imageProcessor.setCalibrationMask(imgLaserOn, imgLaserOff)
 
     def getWorldPoint(self, cameraPoints, step):
         # Intersection of a line and a plane
@@ -242,9 +238,12 @@ class Scene:
         return worldPoints
 
     def runStep(self, step, isLastStep):
+        if(step == 0):
+            self.pipeline.start()
+
         name = ("%d_%s" %(step, self.name))
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture(name, False)*self.calibMask
+        imgLaserOn = self.camera.getPicture(name, False)
 
         name = ("%d_%s" %(step, "off"))
         self.laser.switch(False)
@@ -260,21 +259,42 @@ class ImageProcessor:
     def __init__(self):
         """ Create a new ImageProcessor object
         """
+        self.calibrationMask = None
 
-    def substract(self, foreground, background):
-        image = np.array(foreground, dtype=np.int16) - background
-        image[:,:,:2] = 0
-        image = np.array(image.clip(0), dtype=np.uint8)
-        return image
+    def setCalibrationMask(self, foreground, background):
+        mask = self.getLaserMask(foreground, background)
+        self.calibrationMask = cv2.bitwise_not(mask)
+        cv2.imwrite("mask.png", self.calibrationMask)
 
-    def filterNoise(self, image):
-        image = cv2.GaussianBlur(image,(5,5),0)
-        ret, image = cv2.threshold(image, 27, 255, cv2.THRESH_TOZERO)
-        return image
+    def getRGBmask(self, imageDiff, R_threshold=10, GB_threshold=5):
+        lower = np.array([0, 0, R_threshold], dtype=np.uint8)
+        upper = np.array([GB_threshold, GB_threshold, 255], dtype=np.uint8)
+        mask = cv2.inRange(imageDiff, lower, upper)
+        return cv2.GaussianBlur(mask,(3,3),0)
+
+    def getHSVmask(self, imageDiff, luminosity=20):
+        image = cv2.cvtColor(imageDiff, cv2.COLOR_BGR2HSV)
+
+        lower = np.array([0, 0, luminosity], dtype=np.uint8)
+        upper = np.array([25, 255, 255], dtype=np.uint8)
+        mask1 = cv2.inRange(image, lower, upper)
+
+        lower = np.array([155, 0, luminosity], dtype=np.uint8)
+        upper = np.array([180, 255, 255], dtype=np.uint8)
+        mask2 = cv2.inRange(image, lower, upper)
+
+        return np.bitwise_or(mask1, mask2)
+
+    def getLaserMask(self, foreground, background):
+        imageDiff = np.array(foreground, dtype=np.int16) - background
+        imageDiff = np.array(imageDiff.clip(0, 255), dtype=np.uint8)
+        mask = cv2.bitwise_or(self.getRGBmask(imageDiff), self.getHSVmask(imageDiff))
+        mask = cv2.GaussianBlur(mask,(3,3),0)
+        return cv2.inRange(mask, np.array([250]), np.array([255]))
+        
 
     def massCenter(self, image):
         points = []
-
         for line in range(image.shape[0]):
             moments = cv2.moments(image[line,:,2])
             if(moments['m00'] != 0):
@@ -283,8 +303,8 @@ class ImageProcessor:
         return points
 
     def extractPoints(self, imgLaserOn, imgLaserOff):
-        res = self.substract(imgLaserOn, imgLaserOff)
-        res = self.filterNoise(res)
+        mask = cv2.bitwise_and(self.getLaserMask(imgLaserOn, imgLaserOff), self.calibrationMask)
+        res = cv2.bitwise_and(imgLaserOff, imgLaserOff, mask=mask)
         res = self.massCenter(res)
         return res
 
