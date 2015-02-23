@@ -6,6 +6,7 @@ from math import sqrt
 import Queue
 import numpy as np
 import traceback
+from sys import stdout
 
 class ObjParser:
 	def __init__(self, filename):
@@ -24,11 +25,18 @@ class Mesher:
 		self.faces = set()
 		self.debug = debug
 		self.findSeedTriangle()
+		self.lastFace = (-1, -1, -1)
 		try:
 			self.growRegion()
 		except:
 			traceback.print_exc()
 		self.writeToObj("test.obj")
+
+	def info(self, *msg):
+		msg = ('[%4d faces]' % (len(self.faces)),) + msg
+		line = '\r' + ' '.join(map(str, msg))
+		stdout.write(line.ljust(80))
+		stdout.flush()
 
 	def hasFace(self, p1, p2, p3):
 		return (p1, p2, p3) in self.faces or\
@@ -52,8 +60,11 @@ class Mesher:
 	def writeToObj(self, filename):
 		with open(filename, 'w') as obj:
 			for point in self.points.getSortedPoints():
-				obj.write("v "+str(point.x)+" "+str(point.y)+" "+str(point.z)+"\n")
-			for face in self.faces :
+				obj.write("v "+str(point.x)+" "+str(point.y)+" "+str(point.z))
+				# if point in self.lastFace:
+				# 	obj.write(" 1 0 1")
+				obj.write("\n")
+			for face in self.faces:
 				obj.write("f "+str(face[0].index)+" "+str(face[1].index)+" "+str(face[2].index)+"\n")
 
 	def findSeedTriangle(self):
@@ -104,7 +115,7 @@ class Mesher:
 		a, b = aPoint.toNPArray(), bPoint.toNPArray()
 
 		# midpoint of (a,b)
-		Pm = (a+b)/2
+		# Pm = (a+b)/2
 		# third point of the triangle adjacent to a, b
 		PkPoint = [x for x in self.existingEdges[aPoint] if x in self.existingEdges[bPoint]][0]
 		Pk = PkPoint.toNPArray()
@@ -119,9 +130,11 @@ class Mesher:
 
 		# find edge side direction
 		n5 = np.cross(kb-ka, N)
-		n5 /= np.linalg.norm(n5) # normalize
+		norm = np.linalg.norm(n5)
+		if norm == 0:
+			return None
+		n5 /= norm # normalize
 
-		# TODO check direction of n5 when Mr. Procrastination and Ms. Too Late are gone
 		aa = a + s*n5
 		bb = b + s*n5
 		
@@ -133,17 +146,6 @@ class Mesher:
 		aaa = bb + l*(aa-bb)
 
 		res = [P+N, P-N, aaa+N, aaa-N, bbb+N, bbb-N]
-		with open("degueu.obj", 'w') as lalala:
-			for hello in [a, b, Pk]:
-				print>> lalala, "v %f %f %f 1 0 0" % tuple(hello)
-			for bonjour in res:
-				print>> lalala, "v %f %f %f 0 1 1" % tuple(bonjour)
-			print>> lalala, "f 1 2 3"
-			print>> lalala, "f 5 4 6"
-			print>> lalala, "f 7 5 6"
-			print>> lalala, "f 5 4 8"
-			print>> lalala, "f 5 8 9"
-
 		# we now have to add/subtract N to these points to get the real corners
 		return res
 
@@ -159,15 +161,25 @@ class Mesher:
 
 	def isInnerEdge(self, a, b):
 		"""Return True if edge a,b belongs to 2 triangles"""
-		return len(self.existingEdges.get(a, set()) & self.existingEdges.get(b, set())) == 2
+		inter = self.existingEdges.get(a, set()) & self.existingEdges.get(b, set())
+		if len(inter) != 2:
+			return False
+		for point in inter:
+			if not self.hasFace(a, b, point):
+				return False
+		return True
 
 	def growRegion(self):
 		while not self.activeEdges.empty():
 			a, b = self.activeEdges.get()
 			if self.isInnerEdge(a, b):
 				continue
-			print "Find triangle from edge", repr(a), repr(b)
+			self.info("Find triangle from edge", repr(a), repr(b))
+
+			# The region is malformed; skip
 			regionPoints = self.influenceRegion(a,b)
+			if regionPoints is None:
+				continue
 			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
 			maxCoords = Point(*[max(map(lambda x:x[i], regionPoints)) for i in range(3)])
 			minVoxel = self.points.voxelIndexForPoint(minCoords)
@@ -183,19 +195,19 @@ class Mesher:
 			for newPoint in eps:
 				if self.hasFace(newPoint, a, b) or not self.isInRegion(regionPoints, newPoint):
 					continue
-				print "Add face", repr(a), repr(b), repr(newPoint)
+				self.info("Add face", repr(a), repr(b), repr(newPoint))
 				if not self.hasEdge(newPoint, a):
 					self.activeEdges.put((newPoint, a))
 				else: 
-					print "Already has edge", repr(newPoint), repr(a)
+					self.info("Already has edge", repr(newPoint), repr(a))
 				if not self.hasEdge(newPoint, b):
 					self.activeEdges.put((b, newPoint))
 				else:
-					print "Already has edge", repr(newPoint), repr(b)
+					self.info("Already has edge", repr(newPoint), repr(b))
 				self.setEdge(newPoint, a, b)
-				self.faces.add((newPoint, a, b))
+				self.lastFace = (newPoint, a, b)
+				self.faces.add(self.lastFace)
 				break
-			print "--------------------------------"
 
 			if self.debug:
 				self.writeToObj("test.obj")
@@ -207,10 +219,9 @@ class Mesher:
 					print>> lalala, "f %d %d %d" % (4+nPoints, 2+nPoints, 3+nPoints,)
 					print>> lalala, "f %d %d %d" % (2+nPoints, 1+nPoints, 5+nPoints,)
 					print>> lalala, "f %d %d %d" % (2+nPoints, 5+nPoints, 6+nPoints,)
-				x = raw_input("Reload mesh...")
+		self.info("Finished")
 
-		print "\033[1mHave %d faces\033[0m" % (len(self.faces))
-		print self.existingEdges
+		print
 
 if __name__ == "__main__":
 	from sys import argv
