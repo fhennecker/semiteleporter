@@ -63,6 +63,14 @@ class VoxelSpace:
 		self.voxels = {}
 		self.highestPoint = None
 		self.highestPointIndex = 1 # .obj files start counting vertices at 1, not 0
+		self.boundingBox = [[0,0], [0,0], [0,0]]
+
+	def range3D(self, xmin, xmax, ymin, ymax, zmin, zmax):
+		return combine(
+			xrange(max(xmin, self.boundingBox[0][0]), min(xmax, self.boundingBox[0][1]+1)),
+			xrange(max(ymin, self.boundingBox[1][0]), min(ymax, self.boundingBox[1][1]+1)),
+			xrange(max(zmin, self.boundingBox[2][0]), min(zmax, self.boundingBox[2][1]+1))
+		)
 
 	def __str__(self):
 		return 	"VoxelSpace<voxelSize="+str(self.voxelSize)+\
@@ -88,11 +96,15 @@ class VoxelSpace:
 		return (xVoxel, yVoxel, zVoxel)
 
 	def addPoint(self, point):
-		if isinstance(point, tuple) or isinstance(point, list):
+		if not isinstance(point, Point):
 			point = Point(point[0], point[1], point[2])
 
 		# computing in which voxel the point should be
 		key = self.voxelIndexForPoint(point)
+
+		for i in xrange(3):
+			self.boundingBox[i][0] = min(key[i], self.boundingBox[i][0])
+			self.boundingBox[i][1] = max(key[i], self.boundingBox[i][1])
 
 		# creating a new voxel if necessary
 		if key not in self.voxels:
@@ -131,19 +143,19 @@ class VoxelSpace:
 		Returns a list of all voxels containing points within a hollow voxel cube.
 		"""
 		# Top and bottom planes
-		x, y = xrange(vx-outer+1, vx+outer), xrange(vy-outer+1, vy+outer)
-		voxels = list(combine(x, y, xrange(vz-outer+1, vz-inner+1)))
-		voxels += list(combine(x, y, xrange(vz+inner, vz+outer)))
+		xmin, xmax, ymin, ymax = vx-outer+1, vx+outer, vy-outer+1, vy+outer
+		voxels = list(self.range3D(xmin, xmax, ymin, ymax, vz-outer+1, vz-inner+1))
+		voxels += list(self.range3D(xmin, xmax, ymin, ymax, vz+inner, vz+outer))
 
 		# Left and right planes
-		y, z = xrange(vy-outer+1, vy+outer), xrange(vz-inner+1, vz+inner)
-		voxels += list(combine(xrange(vx-outer+1, vx-inner+1), y, z))
-		voxels += list(combine(xrange(vx+inner, vx+outer), y, z))
+		ymin, ymax, zmin, zmax = vy-outer+1, vy+outer, vz-inner+1, vz+inner
+		voxels += list(self.range3D(vx-outer+1, vx-inner+1, ymin, ymax, zmin, zmax))
+		voxels += list(self.range3D(vx+inner, vx+outer, ymin, ymax, zmin, zmax))
 
 		# Front and back planes
-		x, z = xrange(vx-inner+1, vx+inner), xrange(vz-inner+1, vz+inner)
-		voxels += list(combine(x, xrange(vy-outer+1, vy-inner+1), z))
-		voxels += list(combine(x, xrange(vy+inner, vy+outer), z))
+		xmin, xmax, zmin, zmax = vx-inner+1, vx+inner, vz-inner+1, vz+inner
+		voxels += list(self.range3D(xmin, xmax, vy-outer+1, vy-inner+1, zmin, zmax))
+		voxels += list(self.range3D(xmin, xmax, vy+inner, vy+outer, zmin, zmax))
 
 		# Return only non-empty
 		return list(set(filter(self.voxels.get, voxels)))
@@ -154,18 +166,20 @@ class VoxelSpace:
 
 		def rangeBuilder(a, b, extension):
 			if a < b :
-				return xrange(a-extension, b+extension+1)
+				return (a-extension, b+extension+1)
 			else:
-				return xrange(b-extension, a+extension+1)
+				return (b-extension, a+extension+1)
 
 		# removing center
-		toRemove = set(combine(rangeBuilder(cornerA[0], cornerB[0], inner-1), \
-							rangeBuilder(cornerA[1], cornerB[1], inner-1), \
-							rangeBuilder(cornerA[1], cornerB[1], inner-1)))
+		args = rangeBuilder(cornerA[0], cornerB[0], inner-1) + \
+		       rangeBuilder(cornerA[1], cornerB[1], inner-1) + \
+		       rangeBuilder(cornerA[2], cornerB[2], inner-1)
+		toRemove = set(self.range3D(*args))
 
-		voxels = set(combine(rangeBuilder(cornerA[0], cornerB[0], outer), \
-						rangeBuilder(cornerA[1], cornerB[1], outer), \
-						rangeBuilder(cornerA[1], cornerB[1], outer)))
+		args = rangeBuilder(cornerA[0], cornerB[0], outer) + \
+		       rangeBuilder(cornerA[1], cornerB[1], outer) + \
+		       rangeBuilder(cornerA[2], cornerB[2], outer)
+		voxels = set(self.range3D(*args))
 
 		return filter(self.voxels.get, voxels^toRemove)
 
@@ -174,13 +188,13 @@ class VoxelSpace:
 			region defined by the two corners in argument """
 		def rangeBuilder(a, b):
 			if a < b :
-				return xrange(a, b+1)
+				return (a, b+1)
 			else:
-				return xrange(b, a+1)
-		voxels = combine(rangeBuilder(cornerA[0], cornerB[0]), \
-						rangeBuilder(cornerA[1], cornerB[1]), \
-						rangeBuilder(cornerA[2], cornerB[2]))
-		return filter(self.voxels.get, voxels)
+				return (b, a+1)
+		args = rangeBuilder(cornerA[0], cornerB[0]) + \
+		       rangeBuilder(cornerA[1], cornerB[1]) + \
+		       rangeBuilder(cornerA[2], cornerB[2])
+		return filter(self.voxels.get, self.range3D(*args))
 
 	def pointsInVoxels(self, voxels):
 		get = lambda xyz: self.voxels.get(xyz, [])
