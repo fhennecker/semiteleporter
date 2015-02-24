@@ -1,6 +1,10 @@
 from math import floor, sqrt
 import numpy as np
 
+def norm3D(vec):
+	#return np.linalg.norm(vec)
+	return sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
+
 def flatten(list_of_lists):
 	"""[[a, b], [c, d]] -> [a, b, c, d]"""
 	for lst in list_of_lists:
@@ -66,7 +70,7 @@ class Point:
 		return self.xyz
 
 	def distance(self, other):
-		return np.linalg.norm(self - other)
+		return norm3D(self - other)
 
 class VoxelSpace:
 	""" VoxelSpace holds points within voxels. It makes it easier to find

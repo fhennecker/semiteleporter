@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from VoxelSpace import VoxelSpace, flatten, Point
+from VoxelSpace import VoxelSpace, flatten, Point, norm3D
 from math import sqrt
 import Queue
 import numpy as np
@@ -126,11 +126,11 @@ class Mesher:
 		ka = a-Pk # k->a vector positioned at origin
 		kb = b-Pk # k->b vector positioned at origin
 		N = np.cross(ka, kb)
-		# N /= np.linalg.norm(N) # normalize
+		# N /= norm3D(N) # normalize
 
 		# find edge side direction
 		n5 = np.cross(kb-ka, N)
-		norm = np.linalg.norm(n5)
+		norm = norm3D(n5)
 		if norm == 0:
 			return None
 		n5 /= norm # normalize
@@ -196,7 +196,7 @@ class Mesher:
 			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
 
 			# Get all points around influence region sorted by distance to active edge
-			distanceToEdge = lambda p: np.linalg.norm(p-a) + np.linalg.norm(p-b)
+			distanceToEdge = lambda p: norm3D(p-a) + norm3D(p-b)
 			eligiblePoints = sorted(self.points.pointsInVoxels(voxelsToLookup), key=distanceToEdge)
 
 			for newPoint in eligiblePoints:
