@@ -157,7 +157,7 @@ class Mesher:
 		a, b, c, unused, d, unused2 = regionBox
 		matrix = np.array([b-a, c-a, d-a]).transpose()
 		l, m, g = np.linalg.solve(matrix, point.toNPArray()-a)
-		return 0 < l <= 1 and 0 < m and 0 < g
+		return 0 < l <= 1 and 0 < m and 0 < g and m + g <= 1
 
 	def isInnerEdge(self, a, b):
 		"""Return True if edge a,b belongs to 2 triangles"""
