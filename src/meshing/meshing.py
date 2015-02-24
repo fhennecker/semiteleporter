@@ -171,30 +171,48 @@ class Mesher:
 
 	def growRegion(self):
 		while not self.activeEdges.empty():
+			# Get next active edge
 			a, b = self.activeEdges.get()
+
+			# Already inner edge; skip
 			if self.isInnerEdge(a, b):
 				continue
 			self.info("Find triangle from edge", repr(a), repr(b))
 
-			# The region is malformed; skip
+			# Find influence region bounding (extruded triangle)
 			regionPoints = self.influenceRegion(a,b)
+
+			# The region is malformed; skip
 			if regionPoints is None:
 				continue
+
+			# Triangle bounding box
 			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
 			maxCoords = Point(*[max(map(lambda x:x[i], regionPoints)) for i in range(3)])
+
+			# Voxels bounding box
 			minVoxel = self.points.voxelIndexForPoint(minCoords)
 			maxVoxel = self.points.voxelIndexForPoint(maxCoords)
 			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
 
-			elligible = lambda p: p not in (a, b)
-			eligiblePoints = filter(elligible, self.points.pointsInVoxels(voxelsToLookup))
-
+			# Get all points around influence region sorted by distance to active edge
+			eligiblePoints = self.points.pointsInVoxels(voxelsToLookup)
 			distanceToEdge = lambda p: np.linalg.norm((p-a).toNPArray()) + np.linalg.norm((p-b).toNPArray())
 			eps = sorted(eligiblePoints, key=distanceToEdge)
 
 			for newPoint in eps:
-				if self.hasFace(newPoint, a, b) or not self.isInRegion(regionPoints, newPoint):
+				# Ignore edge vertices
+				if newPoint == a or newPoint == b:
 					continue
+
+				# Already has a face with this point
+				if self.hasFace(newPoint, a, b):
+					continue
+
+				# Point not in influence region (voxel sampling)
+				if not self.isInRegion(regionPoints, newPoint):
+					continue
+
 				self.info("Add face", repr(a), repr(b), repr(newPoint))
 				if not self.hasEdge(newPoint, a):
 					self.activeEdges.put((newPoint, a))
