@@ -196,11 +196,10 @@ class Mesher:
 			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
 
 			# Get all points around influence region sorted by distance to active edge
-			eligiblePoints = self.points.pointsInVoxels(voxelsToLookup)
-			distanceToEdge = lambda p: np.linalg.norm((p-a).toNPArray()) + np.linalg.norm((p-b).toNPArray())
-			eps = sorted(eligiblePoints, key=distanceToEdge)
+			distanceToEdge = lambda p: np.linalg.norm(p-a) + np.linalg.norm(p-b)
+			eligiblePoints = sorted(self.points.pointsInVoxels(voxelsToLookup), key=distanceToEdge)
 
-			for newPoint in eps:
+			for newPoint in eligiblePoints:
 				# Ignore edge vertices
 				if newPoint == a or newPoint == b:
 					continue

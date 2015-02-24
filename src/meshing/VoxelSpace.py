@@ -18,10 +18,17 @@ def combine(Xrange, Yrange, Zrange):
 
 class Point:
 	def __init__(self, x=0, y=0, z=0, index=None):
-		self.x = x
-		self.y = y
-		self.z = z
+		self.xyz = np.array((x, y, z))
 		self.index = index
+
+	@property
+	def x(self): return self.xyz[0]
+
+	@property
+	def y(self): return self.xyz[1]
+	
+	@property
+	def z(self): return self.xyz[2]
 
 	def __str__(self):
 		return "Point<"+str(self.x)+", "+str(self.y)+", "+str(self.z)+", #"+str(self.index)+">"
@@ -46,16 +53,20 @@ class Point:
 		return hash((self.x, self.y, self.z, self.index))
 
 	def __add__(self, other):
-		return Point(self.x+other.x, self.y+other.y, self.z+other.z)
+		if isinstance(other, Point):
+			return self.xyz + other.xyz
+		return self.xyz + other
 
 	def __sub__(self, other):
-		return Point(self.x-other.x, self.y-other.y, self.z-other.z)
+		if isinstance(other, Point):
+			return self.xyz - other.xyz
+		return self.xyz - other
 
 	def toNPArray(self):
-		return np.array([self.x, self.y, self.z])
+		return self.xyz
 
 	def distance(self, other):
-		return sqrt((self.x-other.x)**2 + (self.y-other.y)**2 + (self.z-other.z)**2)
+		return np.linalg.norm(self - other)
 
 class VoxelSpace:
 	""" VoxelSpace holds points within voxels. It makes it easier to find
@@ -199,14 +210,16 @@ class VoxelSpace:
 		return filter(self.voxels.get, self.range3D(*args))
 
 	def pointsInVoxels(self, voxels):
-		get = lambda xyz: self.voxels.get(xyz, [])
-		return flatten(map(get, voxels))
+		# get = lambda xyz: self.voxels.get(xyz, [])
+		# return flatten(map(get, voxels))
+		for vox in voxels:
+			for point in self.voxels.get(vox, []):
+				yield point
 
 	def closestPointTo(self, point, distanceLimit=10, requiresDifferent=False):
 		""" Finds and returns the closest point to (x, y z) 
 			we'll only look in voxels within distanceLimit (distance in voxels)"""
 		
-		distance = lambda p: point.distance(p)
 		cx, cy, cz = self.voxelIndexForPoint(point)
 
 		for i in xrange(distanceLimit):
@@ -214,7 +227,7 @@ class VoxelSpace:
 			# Invariant: if we find points in a layer, the nearest one is in
 			#            this list (we examine layers incrementally)
 			if points:
-				resList = sorted(points, key=distance)
+				resList = sorted(points, key=point.distance)
 				if not requiresDifferent or (requiresDifferent and resList[0] != point):
 					return resList[0]
 				elif len(resList)>1:
@@ -239,14 +252,10 @@ class VoxelSpace:
 
 		# didn't find any point, start looking in layers around region
 		if not res:
-			print "did not find point in region defined by", aVoxel, "and", bVoxel
 			layer = 1
 			while layer<distanceLimit and not res:
-				print layer, self.voxelsAroundRegion(aVoxel, bVoxel, layer)
 				for point in self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer)):
-					print "checking for", point
 					distance = point.distance(a)+point.distance(b)
-					print bestDistance, distance
 					if distance < bestDistance:
 						bestDistance = distance
 						res = point
