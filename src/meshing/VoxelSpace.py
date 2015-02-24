@@ -3,7 +3,9 @@ import numpy as np
 
 def flatten(list_of_lists):
 	"""[[a, b], [c, d]] -> [a, b, c, d]"""
-	return reduce(list.__add__, list_of_lists, [])
+	for lst in list_of_lists:
+		for elem in lst:
+			yield elem
 
 def combine(Xrange, Yrange, Zrange):
 	"""
