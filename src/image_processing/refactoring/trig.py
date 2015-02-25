@@ -246,7 +246,7 @@ class Scene:
 
             # Conserve only points on the table
             if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
-                worldPoints.append(point.T)
+                worldPoints.append(np.array(point.T)[0])
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
         return worldPoints
