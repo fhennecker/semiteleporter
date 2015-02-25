@@ -186,45 +186,36 @@ class Mesher:
 			if regionPoints is None:
 				continue
 
-			# Triangle bounding box
-			minCoords = Point(*[min(map(lambda x:x[i], regionPoints)) for i in range(3)])
-			maxCoords = Point(*[max(map(lambda x:x[i], regionPoints)) for i in range(3)])
+			found = False
+			for newPoints in self.points.closestPointsToEdge(a, b, 20):
+				if found:
+					break
+					
+				for newPoint in newPoints:
+					if found: 
+						break
+					# Already has a face with this point
+					if self.hasFace(newPoint, a, b):
+						continue
 
-			# Voxels bounding box
-			minVoxel = self.points.voxelIndexForPoint(minCoords)
-			maxVoxel = self.points.voxelIndexForPoint(maxCoords)
-			voxelsToLookup = self.points.voxelsInRegion(minVoxel, maxVoxel)
+					# Point not in influence region (voxel sampling)
+					if not self.isInRegion(regionPoints, newPoint):
+						continue
 
-			# Get all points around influence region sorted by distance to active edge
-			distanceToEdge = lambda p: norm3D(p-a) + norm3D(p-b)
-			eligiblePoints = sorted(self.points.pointsInVoxels(voxelsToLookup), key=distanceToEdge)
+					self.info("Add face", repr(a), repr(b), repr(newPoint))
+					if not self.hasEdge(newPoint, a):
+						self.activeEdges.put((newPoint, a))
+					else: 
+						self.info("Already has edge", repr(newPoint), repr(a))
+					if not self.hasEdge(newPoint, b):
+						self.activeEdges.put((b, newPoint))
+					else:
+						self.info("Already has edge", repr(newPoint), repr(b))
+					self.setEdge(newPoint, a, b)
+					self.lastFace = (newPoint, a, b)
+					self.faces.add(self.lastFace)
+					found = True
 
-			for newPoint in eligiblePoints:
-				# Ignore edge vertices
-				if newPoint == a or newPoint == b:
-					continue
-
-				# Already has a face with this point
-				if self.hasFace(newPoint, a, b):
-					continue
-
-				# Point not in influence region (voxel sampling)
-				if not self.isInRegion(regionPoints, newPoint):
-					continue
-
-				self.info("Add face", repr(a), repr(b), repr(newPoint))
-				if not self.hasEdge(newPoint, a):
-					self.activeEdges.put((newPoint, a))
-				else: 
-					self.info("Already has edge", repr(newPoint), repr(a))
-				if not self.hasEdge(newPoint, b):
-					self.activeEdges.put((b, newPoint))
-				else:
-					self.info("Already has edge", repr(newPoint), repr(b))
-				self.setEdge(newPoint, a, b)
-				self.lastFace = (newPoint, a, b)
-				self.faces.add(self.lastFace)
-				break
 
 			if self.debug:
 				self.writeToObj("test.obj")
