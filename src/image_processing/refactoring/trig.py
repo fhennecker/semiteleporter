@@ -3,7 +3,7 @@ import Tkinter, ttk, tkFileDialog, tkMessageBox
 import numpy as np
 import serial
 import threading
-from time import sleep
+import  time
 import inspect
 import multiprocessing
 
@@ -21,7 +21,7 @@ class Arduino:
         self.isActive = isActive
         try:
             self.serialPort = serial.Serial(port, 115200)
-            sleep(2)
+            time.sleep(2)
             self.command('P')
             logging.debug("Handshaking with Arduino...")
         except:
@@ -54,18 +54,18 @@ class Laser:
         """ Create a new Laser object
         pin      = number of the pin connected to the arduino
         position = [X, Y, Z], laser position
-        yAngle   = angle of the laser plane with YZ plane in degree (left=positive)
+        yAngle   = angle of the laser plane with YZ plane in radians (left=positive)
         arduino  = the arduino interface
         """
 
         logging.debug("Create laser @ %s, yAngle=%.2f, pin=%s" % (position, yAngle, pin))
 
         self.pin      = pin
-        self.position = np.array(position, dtype=np.float64)
-        self.yAngle   = np.radians(yAngle)
+        self.position = np.array(position, dtype=np.float32)
+        self.yAngle   = yAngle
         self.arduino  = arduino
-        self.v1       = np.array([0,1,0], dtype=np.float64)
-        self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float64)
+        self.v1       = np.array([0,1,0], dtype=np.float32)
+        self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float32)
 
     def switch(self, switchOn):
         if(switchOn):
@@ -92,31 +92,33 @@ class Camera:
 
         self.camId     = int(port[-1])
         self.shape     = shape
-        self.position  = np.array(position, dtype=np.float64)
-        self.distance  = (shape[0]/2)/np.tan(np.radians(viewAngle)/2)
-        self.viewAngle = viewAngle
-        self.rotation  = np.radians(np.array(rotation, dtype=np.float64))
+        self.position  = np.array(position, dtype=np.float32)
+        self.distance  = float(shape[0]/2)/np.tan(np.radians(viewAngle)/2)
+        self.rotation  = np.radians(np.array(rotation, dtype=np.float32))
         self.save      = save
         self.processDirectory = processDirectory
         self.buffered  = ("", None)
 
         # First Rotate around Y/vertical axis
-        self.rotationMatrix = np.matrix([[np.cos(rotation[1]), 0, -np.sin(rotation[1])],
-                                         [0                  , 1,  0                  ],
-                                         [np.sin(rotation[1]), 0,  np.cos(rotation[1])]])
+        self.rotationMatrix = np.matrix([[np.cos(self.rotation[1]), 0, -np.sin(self.rotation[1])],
+                                         [0                       , 1,  0                       ],
+                                         [np.sin(self.rotation[1]), 0,  np.cos(self.rotation[1])]])
         # Then Rotate around X/horizontal axis
-        self.rotationMatrix *= np.matrix([[1, 0                  ,  0                  ],
-                                          [0, np.cos(rotation[0]), -np.sin(rotation[0])],
-                                          [0, np.sin(rotation[0]),  np.cos(rotation[0])]])
+        self.rotationMatrix *= np.matrix([[1, 0                       ,  0                       ],
+                                          [0, np.cos(self.rotation[0]), -np.sin(self.rotation[0])],
+                                          [0, np.sin(self.rotation[0]),  np.cos(self.rotation[0])]])
         # Then Rotate around Z/depth axis
-        self.rotationMatrix *= np.matrix([[np.cos(rotation[2]), -np.sin(rotation[2]), 0],
-                                          [np.sin(rotation[2]),  np.cos(rotation[2]), 0],
-                                          [0                  ,  0                  , 1]])
+        self.rotationMatrix *= np.matrix([[np.cos(self.rotation[2]), -np.sin(self.rotation[2]), 0],
+                                          [np.sin(self.rotation[2]),  np.cos(self.rotation[2]), 0],
+                                          [0                      ,  0                        , 1]])
 
         if(self.save != None and not os.path.exists(self.save[0])):
             logging.debug("Creating %s directory for pictures" %(self.save[0]))
             os.makedirs(self.save[0])
 
+        cam = cv2.VideoCapture(self.camId)
+        cam.read()
+        cam.release()
 
     def getPicture(self, name, toBuffer=False):
         picture = None;
@@ -136,8 +138,8 @@ class Camera:
                 elif(self.save != None):
                     cv2.imwrite(os.path.join(self.save[0],name+self.save[1]), picture)
   
-            if(toBuffer):
-                self.buffered = (name, np.copy(picture))
+                if(toBuffer):
+                    self.buffered = (name, np.copy(picture))
         else:
             logging.debug('Reading a picture')
             picture = cv2.imread(os.path.join(self.processDirectory, name+self.save[1]))
@@ -156,7 +158,7 @@ class TurnTable:
 
         logging.debug("Create turntable @ %s, diameter = %.2f" % (position, diameter))
 
-        self.position  = np.array(position, dtype=np.float64)
+        self.position  = np.array(position, dtype=np.float32)
         self.diameter  = diameter
         self.nSteps    = int(nSteps)
         self.arduino   = arduino
@@ -191,15 +193,24 @@ class Scene:
         self.imageProcessor = ImageProcessor()
         self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
                                    self.getWorldPoint)
+        self.result = []
 
     def __iter__(self):
-        return self.pipeline.__iter__()
+        if(len(self.result) != 0):
+            for item in self.result:
+                yield item
+        else:
+            item = self.pipeline.get()
+            while(item != None):
+                self.result += item
+                yield item
+                item = self.pipeline.get()
 
     def calibration(self):
         self.laser.switch(True)
-        imgLaserOn = self.camera.getPicture("calibration_0_"+self.name)
+        imgLaserOn = self.camera.getPicture("calibration_"+self.name)
         self.laser.switch(False)
-        imgLaserOff = self.camera.getPicture("calibration_1_"+self.name)
+        imgLaserOff = self.camera.getPicture("calibration_off", True)
 
         self.imageProcessor.setCalibrationMask(imgLaserOn, imgLaserOff)
 
@@ -231,9 +242,10 @@ class Scene:
             point = self.turntable.getRotationMatrix(step) * (point - self.turntable.position).T
 
             # Conserve only points on the table
-            if(point[1]>0 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
+            if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
                 worldPoints.append(point.T)
-                #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
+                logging.debug("%s -> %s" % (str(pixel),str(point.T)))
+            print("%s -> %s" % (str(pixel),str(point.T)))
         
         return worldPoints
 
@@ -254,7 +266,6 @@ class Scene:
             self.pipeline.terminate()
 
 
-
 class ImageProcessor:
     def __init__(self):
         """ Create a new ImageProcessor object
@@ -264,7 +275,6 @@ class ImageProcessor:
     def setCalibrationMask(self, foreground, background):
         mask = self.getLaserMask(foreground, background)
         self.calibrationMask = cv2.bitwise_not(mask)
-        cv2.imwrite("mask.png", self.calibrationMask)
 
     def getRGBmask(self, imageDiff, R_threshold=10, GB_threshold=5):
         lower = np.array([0, 0, R_threshold], dtype=np.uint8)
@@ -275,11 +285,11 @@ class ImageProcessor:
     def getHSVmask(self, imageDiff, luminosity=20):
         image = cv2.cvtColor(imageDiff, cv2.COLOR_BGR2HSV)
 
-        lower = np.array([0, 0, luminosity], dtype=np.uint8)
-        upper = np.array([25, 255, 255], dtype=np.uint8)
+        lower = np.array([0, 10, luminosity], dtype=np.uint8)
+        upper = np.array([10, 255, 255], dtype=np.uint8)
         mask1 = cv2.inRange(image, lower, upper)
 
-        lower = np.array([155, 0, luminosity], dtype=np.uint8)
+        lower = np.array([170, 10, luminosity], dtype=np.uint8)
         upper = np.array([180, 255, 255], dtype=np.uint8)
         mask2 = cv2.inRange(image, lower, upper)
 
@@ -304,7 +314,7 @@ class ImageProcessor:
 
     def extractPoints(self, imgLaserOn, imgLaserOff):
         mask = cv2.bitwise_and(self.getLaserMask(imgLaserOn, imgLaserOff), self.calibrationMask)
-        res = cv2.bitwise_and(imgLaserOff, imgLaserOff, mask=mask)
+        res = cv2.bitwise_and(imgLaserOn, imgLaserOn, mask=mask)
         res = self.massCenter(res)
         return res
 
@@ -360,13 +370,12 @@ class Pipeline:
                 out_queue = multiprocessing.Queue()
                 self.stages.append(PipelineStage(methods[order], in_queue, out_queue))
                 in_queue = out_queue
-        self.start()
 
-    def __iter__(self):
+    def get(self):
         item = self.out_queue.get()
-        while(item != EndOfProcessing):
-            yield item[0]
-            item = self.out_queue.get()
+        if(item == EndOfProcessing):
+            item = None
+        return item
             
     def start(self):
         map(PipelineStage.start, self.stages)
@@ -376,45 +385,6 @@ class Pipeline:
 
     def terminate(self):
         self.feed(EndOfProcessing)
-
-
-class PipeMerge:
-    def __init__(self, *pipelines):
-        self.pipelines = pipelines
-
-    def get_first(self):
-        """
-        Yield the first available element from any pipeline.
-        """
-        while len(self.pipelines) > 0:
-            availables = map(lambda p: not p.out_queue.empty(), self.pipelines)
-            removed = 0
-            for idx, avail in enumerate(availables):
-                i = idx - removed
-                if avail:
-                    got = self.pipelines[i].out_queue.get()
-                    if got == EndOfProcessing:
-                        del self.pipelines[i]
-                        removed += 1
-                    else:
-                        yield got
-
-    def get_all(self):
-        """
-        Yields the output of all pipelines in a vector, once an entire one is
-        available.
-        """
-        while len(self.pipelines) > 0:
-            while True in map(lambda p: not p.out_queue.empty(), self.pipelines):
-                pass
-            got = map(lambda p: p.out_queue.get(), self.pipelines)
-            removed = 0
-            for idx, item in enumerate(got):
-                i = idx - removed
-                if item == EndOfProcessing:
-                    del self.pipelines[i]
-                    removed += 1
-            yield filter(lambda x: x != EndOfProcessing, got)
 
 
 class Config:
@@ -448,11 +418,12 @@ class Config:
                 self.config[section] = dict()
                 for option in self.parser.options(section):
                     value = self.parser.get(section, option)
-                    if(value.isdigit()):
-                        self.config[section][option] = float(value)
-                    elif(',' in value):
-                        self.config[section][option] = np.array(value.split(','), dtype=np.float64)
-                    else:
+                    try:
+                        if(',' in value):
+                            self.config[section][option] = np.array(value.split(','), dtype=np.float32)
+                        else:
+                            self.config[section][option] = float(value)
+                    except:
                         self.config[section][option] = value
         else:
             logging.error("File %s don't exist" % self.configFile)
@@ -548,6 +519,12 @@ class Scanner3D(Tkinter.Tk):
             else:
                 assert False, "Unknown option"
 
+    def exportToObjFile(self, filename):
+        fp = open(filename, 'w')
+        for step in self.sceneRight:
+            for point in step:
+                fp.write('v %s %s %s\n' %(point.item(0), point.item(1), point.item(2)))
+        fp.close()
 
     def loadConfig(self):
 
@@ -571,14 +548,14 @@ class Scanner3D(Tkinter.Tk):
         pos = self.config['LaserRight']['position']
         laserRight = Laser(self.config['LaserRight']['pin'],
                            pos,
-                           np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
+                           np.arctan(pos[0]/self.turntable.position[2]),
                            arduino)
         self.sceneRight = Scene("right", camera, laserRight, self.turntable)
 
         pos = self.config['LaserLeft']['position']
         laserLeft = Laser(self.config['LaserLeft']['pin'],
                           pos,
-                          np.degrees(np.arctan(pos[0]/self.turntable.position[2])),
+                          np.arctan(pos[0]/self.turntable.position[2]),
                           arduino)
         self.sceneLeft  = Scene("left", camera, laserLeft,  self.turntable)    
 
@@ -711,7 +688,7 @@ class SetupTab(Tab):
                 res = self.entries[section][option]
                 if(type(res) == list):
                     res = [res[0].get(),res[1].get(),res[2].get()]
-                    self.config[section][option] = np.array(res, dtype=np.float64)
+                    self.config[section][option] = np.array(res, dtype=np.float32)
                 else:
                     try:
                         self.config[section][option] = float(res.get())
@@ -762,19 +739,38 @@ class ViewerTab(Tab):
         frame = Tkinter.LabelFrame(self, text="Options", font=("bold"))
         frame.grid(row=0, column=1)
         Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=0)
+        Tkinter.Button(frame, text="Export", command=self.export).grid(row=1, column=0)
+
+    def export(self):
+        ext = None
+        filename = None
+        while(ext!=".obj" and filename != ''):
+            filename = tkFileDialog.asksaveasfilename(defaultextension=".obj")
+            ext = os.path.splitext(filename)[-1]
+        if(filename != ""):
+            self.scanner.exportToObjFile(filename)
 
     def start(self):
         self.scanner.startScan()
         self.plot()
 
-    def plot(self):
-        self.createGraph(False)
-        logging.info("Start plotting")
-        for item_left, item_right in PipeMerge(self.scanner.sceneLeft.pipeline, self.scanner.sceneRight.pipeline).get_all():
-            points = np.array(item_left + item_right).T
-            if(len(points) != 0):
-                self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
-                self.graph.draw()
+    def plot(self, scene=None, lock=None):
+        if(lock == None):
+            self.createGraph(False)
+            logging.info("Start plotting")
+            lock = threading.Lock()
+            thread_left = threading.Thread(target=self.plot, args=(self.scanner.sceneLeft, lock))
+            thread_right = threading.Thread(target=self.plot, args=(self.scanner.sceneRight, lock))
+            thread_left.start()
+            thread_right.start()
+        else:
+            for item in scene:
+                points = np.array(item).T
+                if(len(points) != 0):
+                    lock.acquire()
+                    self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+                    self.graph.draw()
+                    lock.release()
 
 
 
