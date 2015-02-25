@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import os, sys
 
 # Object to scan, flat in XZ plane
 # Square
@@ -76,6 +77,8 @@ class myLaser:
 # ----------------------------------------------------------------------------------------
         
 if(__name__=="__main__"):
+    path = "./"+os.path.dirname(sys.argv[0])
+
     laserLeft  = myLaser(laserLeftPos,turnTablePos, 'left')
     laserRight = myLaser(laserRightPos,turnTablePos, 'right')
 
@@ -84,6 +87,11 @@ if(__name__=="__main__"):
     screenSize = np.array(cameraSize, dtype = float)
     screenPos = np.array(cameraPos, dtype=float) + screenDir * (screenSize[0]/2)/np.tan(cameraAngle/2)/np.linalg.norm(screenDir)
     cameraPlane = c3DPlane(screenPos , screenDir, screenSize)
+
+    img=np.zeros((screenSize[1], screenSize[0], 3), np.uint8)
+    cv2.imwrite(os.path.join(path, 'calibration_off.png'),img)
+    cv2.imwrite(os.path.join(path, 'calibration_right.png'),img)
+    cv2.imwrite(os.path.join(path, 'calibration_left.png'),img)
 
     for step in range(nSteps):
         # Rotate turnTable
@@ -119,7 +127,7 @@ if(__name__=="__main__"):
                 prevEdge=edge
 
         # Save image with laser off
-            cv2.imwrite('%d_off.png' % (step),img)
+            cv2.imwrite(os.path.join(path, '%d_off.png' % (step)),img)
             
             # Compute laser intersections with objects        
             l2DPoints=[]
@@ -160,7 +168,7 @@ if(__name__=="__main__"):
                 prevPoint=newPoint
 
         # Save image with laser on
-            cv2.imwrite('%d_%s.png' % (step, laser.name),img)
+            cv2.imwrite(os.path.join(path, '%d_%s.png' % (step, laser.name)),img)
 
             img=cv2.resize(img, (0,0), fx=0.5, fy=0.5)
             cv2.imshow('Camera',img)

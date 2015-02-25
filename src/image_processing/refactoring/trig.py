@@ -6,6 +6,7 @@ import threading
 import  time
 import inspect
 import multiprocessing
+import shutil
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -19,13 +20,14 @@ class Arduino:
         """
         logging.debug("Create Arduino @ port %s" % (port))
         self.isActive = isActive
-        try:
-            self.serialPort = serial.Serial(port, 115200)
-            time.sleep(2)
-            self.command('P')
-            logging.debug("Handshaking with Arduino...")
-        except:
-            logging.warning("\033[93m No arduino connected / bad serial port.. \033[0m")
+        if(isActive):
+            try:
+                self.serialPort = serial.Serial(port, 115200)
+                time.sleep(2)
+                self.command('P')
+                logging.debug("Handshaking with Arduino...")
+            except:
+                logging.warning("\033[93m No arduino connected / bad serial port.. \033[0m")
 
     def command(self, cmd):
         #FIXME why arduino fails to response sometimes ?
@@ -70,10 +72,10 @@ class Laser:
     def switch(self, switchOn):
         if(switchOn):
             self.arduino.command(self.pin.upper())
-            logging.debug('Switching laser on pin %s %s' %(self.pin, 'ON'))
+            logging.info('Switching laser on pin %s %s' %(self.pin, 'ON'))
         else:
             self.arduino.command(self.pin.lower())
-            logging.debug('Switching laser on pin %s %s' %(self.pin, 'OFF'))
+            logging.info('Switching laser on pin %s %s' %(self.pin, 'OFF'))
 
 
 class Camera:
@@ -112,18 +114,15 @@ class Camera:
                                           [np.sin(self.rotation[2]),  np.cos(self.rotation[2]), 0],
                                           [0                      ,  0                        , 1]])
 
-        if(self.save != None and not os.path.exists(self.save[0])):
-            logging.debug("Creating %s directory for pictures" %(self.save[0]))
-            os.makedirs(self.save[0])
-
-        cam = cv2.VideoCapture(self.camId)
-        cam.read()
-        cam.release()
+        if(self.processDirectory == None):
+            cam = cv2.VideoCapture(self.camId)
+            cam.read()
+            cam.release()
 
     def getPicture(self, name, toBuffer=False):
         picture = None;
         if(self.processDirectory == None):
-            logging.debug('Taking a picture')
+            logging.info('Taking a picture')
  
             if(self.buffered[0] == name):
                 picture = self.buffered[1]
@@ -135,13 +134,13 @@ class Camera:
                 cam.release()
                 if not ok:
                     logging.error("impossible to get a picture from the camera..")
-                elif(self.save != None):
+                elif(len(self.save[0]) > 0):
                     cv2.imwrite(os.path.join(self.save[0],name+self.save[1]), picture)
   
                 if(toBuffer):
                     self.buffered = (name, np.copy(picture))
         else:
-            logging.debug('Reading a picture')
+            logging.info('Reading a picture')
             picture = cv2.imread(os.path.join(self.processDirectory, name+self.save[1]))
 
         return picture
@@ -173,9 +172,8 @@ class TurnTable:
         
 
     def rotate(self, step=1):
-        logging.debug('Rotating the turntable')
+        logging.info('Rotating the turntable')
         self.arduino.command('T')
-        #FIXME control the stepper motor to rotate here
         
 
 class Scene:
@@ -244,8 +242,7 @@ class Scene:
             # Conserve only points on the table
             if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
                 worldPoints.append(point.T)
-                logging.debug("%s -> %s" % (str(pixel),str(point.T)))
-            print("%s -> %s" % (str(pixel),str(point.T)))
+                #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
         return worldPoints
 
@@ -342,13 +339,13 @@ class PipelineStage(multiprocessing.Process):
             try:
                 nbrOfArgs = len(inspect.getargspec(self.method).args)-1
                 res = (self.method(*args[:nbrOfArgs]),)+args[nbrOfArgs:]
-                logging.info("Process '%s' put a result" %(self.method.__name__))
+                logging.debug("Process '%s' put a result" %(self.method.__name__))
                 self.out_queue.put(res)
             except:
                 logging.error("Bad args format in PipelineStage '%s'" %(self.method.__name__))
             args = self.in_queue.get()
         self.out_queue.put(EndOfProcessing)
-        logging.info("Process '%s' down" %(self.method.__name__))
+        logging.debug("Process '%s' down" %(self.method.__name__))
 
 
 class Pipeline:
@@ -392,8 +389,7 @@ class Config:
         """ Create a new Config object
         configFile = name of the config file
         """
-        self.default = "default.cfg"
-
+        self.default = 'default.cfg'
         if(configFile == ""):
             self.configFile = self.default
         else:
@@ -410,24 +406,35 @@ class Config:
         if(configFile != ""):
             self.configFile = configFile
 
-        if(os.path.exists(self.configFile)):
-            logging.info("Loading %s configuration file" % self.configFile)
-            self.parser.read(self.configFile)
+        if(not os.path.exists(self.configFile)):
+            if(os.path.exists(self.default)):
+                shutil.copy(self.default,self.configFile)
+            else:
+                logging.error("No '%s' or other config file found" %self.default)
+                sys.exit(2)
 
-            for section in self.parser.sections():
-                self.config[section] = dict()
-                for option in self.parser.options(section):
-                    value = self.parser.get(section, option)
-                    try:
-                        if(',' in value):
-                            self.config[section][option] = np.array(value.split(','), dtype=np.float32)
-                        else:
-                            self.config[section][option] = float(value)
-                    except:
-                        self.config[section][option] = value
-        else:
-            logging.error("File %s don't exist" % self.configFile)
-            sys.exit(2)
+        logging.info("Loading %s configuration file" % self.configFile)
+        self.parser.read(self.configFile)
+
+        for section in self.parser.sections():
+            self.config[section] = dict()
+            for option in self.parser.options(section):
+                value = self.parser.get(section, option)
+                try:
+                    if(',' in value):
+                        self.config[section][option] = np.array(value.split(','), dtype=np.float32)
+                    else:
+                        self.config[section][option] = float(value)
+                except:
+                    self.config[section][option] = value
+
+        dest = self.config['File']['save']
+        if(dest not in ('', './')):
+            if(not os.path.exists(dest)):
+                logging.debug("Creating %s directory for pictures" %(dest))
+                os.makedirs(dest)
+                shutil.copy(self.configFile, os.path.join(dest, self.default))
+            self.configFile = os.path.join(dest,self.default)
 
     def getToStr(self, section, option, toList=True):
         value = self.config
@@ -445,10 +452,8 @@ class Config:
             logging.error("Bad indexing in Config dico")
         return value
             
-    def save(self, configFile=""):
-        if((configFile == "" and self.configFile == self.default) or self.configFile == self.default):
-            configFile = "default_1.cfg"
-        logging.info("Saving configuration in %s" %(configFile))
+    def save(self):
+        logging.info("Saving configuration in %s" %(self.configFile))
 
         for section in self.config:
             for option in self.config[section]:
@@ -458,7 +463,7 @@ class Config:
                 except:
                     self.parser.add_section(section)
                     self.parser.set(section, option, value)
-        self.parser.write(open(configFile,'w'))
+        self.parser.write(open(self.configFile,'w'))
 
 
 
@@ -514,6 +519,7 @@ class Scanner3D(Tkinter.Tk):
                     sys.exit(2)
             elif(o in ("-p", "--processing")):
                 self.directory = a
+                self.config = Config(os.path.join(a,'default.cfg'))
             elif(o in ("-a", "--arduino")):
                 self.arduino = Arduino(a)
             else:
@@ -527,7 +533,6 @@ class Scanner3D(Tkinter.Tk):
         fp.close()
 
     def loadConfig(self):
-
         camera = Camera(self.config['Camera']['port'],
                         (self.config['Camera']['width'], self.config['Camera']['height']),
                         self.config['Camera']['position'],
@@ -625,14 +630,15 @@ class SetupTab(Tab):
         for i in range(3):
             self.columnconfigure(i, weight=1)
 
-        self.createSectionFrame("Arduino").grid(row=0, column=0, columnspan=3)
-        self.createSectionFrame("Camera").grid(row=1, column=0, columnspan=3)
-        self.createSectionFrame("LaserLeft").grid(row=2, column=0, columnspan=3)
-        self.createSectionFrame("LaserRight").grid(row=3, column=0, columnspan=3)
-        self.createSectionFrame("TurnTable").grid(row=4, column=0, columnspan=3)
-        Tkinter.Button(self, text="Open", command=self.openConfigFile).grid(row=5, column=0, sticky='e')
-        Tkinter.Button(self, text="Load", command=self.loadConfigFile).grid(row=5, column=1)
-        Tkinter.Button(self, text="Save", command=self.saveConfigFile).grid(row=5, column=2, sticky='w')
+        self.createSectionFrame("File").grid(row=0, column=0, columnspan=3)
+        self.createSectionFrame("Arduino").grid(row=1, column=0, columnspan=3)
+        self.createSectionFrame("Camera").grid(row=2, column=0, columnspan=3)
+        self.createSectionFrame("LaserLeft").grid(row=3, column=0, columnspan=3)
+        self.createSectionFrame("LaserRight").grid(row=4, column=0, columnspan=3)
+        self.createSectionFrame("TurnTable").grid(row=5, column=0, columnspan=3)
+        Tkinter.Button(self, text="Open", command=self.openConfigFile).grid(row=6, column=0, sticky='e')
+        Tkinter.Button(self, text="Load", command=self.loadConfigFile).grid(row=6, column=1)
+        Tkinter.Button(self, text="Save", command=self.saveConfigFile).grid(row=6, column=2, sticky='w')
 
     def createSectionFrame(self, section):
         frame = Tkinter.LabelFrame(self, text=section, font=("bold"))
@@ -696,13 +702,8 @@ class SetupTab(Tab):
                         self.config[section][option] = res.get()
 
     def saveConfigFile(self):
-        ext = None
-        filename = None
-        while(ext!=".cfg" and filename != ''):
-            filename = tkFileDialog.asksaveasfilename(defaultextension=".cfg")
-            ext = os.path.splitext(filename)[-1]
-        if(filename != ''):
-            self.config.save(filename)
+        self.loadConfigFile()
+        self.config.save()
 
 
 class ViewerTab(Tab):
