@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+from douglaspeucker import reduce_pointset
 
 class Arduino:
     def __init__(self, port, isActive=True):
@@ -38,7 +39,7 @@ class Arduino:
                 while(response == ''):
                     response = self.serialPort.read(3)
             except:
-                logging.error("\033[93m Impossible to send the command to the arduino.. \033[0m")
+                logging.exception("\033[93m Impossible to send the command to the arduino.. \033[0m")
 
         return response
 
@@ -190,7 +191,8 @@ class Scene:
         self.turntable  = turntable
         self.imageProcessor = ImageProcessor()
         self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
-                                   self.getWorldPoint)
+                                   self.getWorldPoint,
+                                   self.simplify)
         self.result = []
 
     def __iter__(self):
@@ -203,6 +205,9 @@ class Scene:
                 self.result += item
                 yield item
                 item = self.pipeline.get()
+
+    def simplify(self, points):
+        return reduce_pointset(points, 3)
 
     def calibration(self):
         self.laser.switch(True)
@@ -588,7 +593,7 @@ class Scanner3D(Tkinter.Tk):
             if(self.gui == None):
                 raw_input('')
             else:
-                self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
+                self.gui.popUpConfirm('Calibration', 'Calibration : Place object and press OK...')
 
             self.thread = threading.Thread(target=self.startScan, args=(False,))
             self.thread.start()
