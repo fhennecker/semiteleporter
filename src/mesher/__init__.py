@@ -26,11 +26,6 @@ class Mesher:
         self.debug = debug
         self.findSeedTriangle()
         self.lastFace = (-1, -1, -1)
-        try:
-            self.growRegion()
-        except:
-            traceback.print_exc()
-        self.writeToObj("test.obj")
 
     def info(self, *msg):
         msg = ('[%4d faces]' % (len(self.faces)),) + msg
@@ -169,7 +164,7 @@ class Mesher:
                 return False
         return True
 
-    def growRegion(self):
+    def run(self):
         while not self.activeEdges.empty():
             # Get next active edge
             a, b = self.activeEdges.get()

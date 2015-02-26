@@ -7,7 +7,8 @@ from gui import Gui, Tkinter
 from scanner.config import Config
 from scanner.camera import Camera, Scene
 from scanner.arduino import Arduino, TurnTable, Laser
-
+from mesher.voxel import VoxelSpace
+from mesher import Mesher
 
 class Scanner3D(Tkinter.Tk):
     def __init__(self, args):
@@ -64,6 +65,20 @@ class Scanner3D(Tkinter.Tk):
                 self.arduino = Arduino(a)
             else:
                 assert False, "Unknown option"
+
+    def meshToObjFile(self, filename):
+        space = VoxelSpace(10)
+        for scene in (self.sceneRight, self.sceneLeft):
+            for step in scene:
+                for point in step:
+                    print point
+                    space.addPoint(point)
+        mesher = Mesher(space)
+        try:
+            mesher.run()
+            mesher.writeToObj(filename)
+        except:
+            logging.exception("\033[31mError during meshing of %s\033[0m" % (filename))
 
     def exportToObjFile(self, filename):
         fp = open(filename, 'w')

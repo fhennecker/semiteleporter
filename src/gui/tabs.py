@@ -146,15 +146,19 @@ class ViewerTab(Tab):
         frame.grid(row=0, column=1)
         Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=0)
         Tkinter.Button(frame, text="Export", command=self.export).grid(row=1, column=0)
-        Tkinter.Button(frame, text="Quit", command=self.winfo_toplevel().destroy).grid(row=2, column=0)
+        Tkinter.Button(frame, text="Mesh", command=self.mesh).grid(row=2, column=0)
+        Tkinter.Button(frame, text="Quit", command=self.winfo_toplevel().destroy).grid(row=3, column=0)
 
-    def export(self):
-        ext = None
-        filename = None
-        while(ext!=".obj" and filename != ''):
+    def _objSaveDialog(self):
+        filename, ext = None, None
+        while ext != ".obj" and filename != '':
             filename = tkFileDialog.asksaveasfilename(defaultextension=".obj")
             ext = os.path.splitext(filename)[-1]
-        if(filename != ""):
+        return filename
+
+    def export(self):
+        filename = self._objSaveDialog()
+        if filename != "":
             self.scanner.exportToObjFile(filename)
 
     def start(self):
@@ -178,3 +182,8 @@ class ViewerTab(Tab):
                     self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
                     self.graph.draw()
                     lock.release()
+
+    def mesh(self):
+        filename = self._objSaveDialog()
+        if filename != "":
+            self.scanner.meshToObjFile(filename)
