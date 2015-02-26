@@ -746,6 +746,7 @@ class ViewerTab(Tab):
         frame.grid(row=0, column=1)
         Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=0)
         Tkinter.Button(frame, text="Export", command=self.export).grid(row=1, column=0)
+        Tkinter.Button(frame, text="Quit", command=self.winfo_toplevel().destroy).grid(row=2, column=0)
 
     def export(self):
         ext = None
