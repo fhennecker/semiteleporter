@@ -66,12 +66,16 @@ class Scanner3D(Tkinter.Tk):
             else:
                 assert False, "Unknown option"
 
-    def meshToObjFile(self, filename):
-        space = VoxelSpace(10)
+    def toVoxelSpace(self, voxelSize=10):
+        space = VoxelSpace(voxelSize)
         for scene in (self.sceneRight, self.sceneLeft):
             for step in scene:
                 for point in step:
-                    space.addPoint((point[0], point[2], point[1]))
+                    space.addPoint(point)
+        return space
+
+    def meshToObjFile(self, filename):
+        space = self.toVoxelSpace()
         mesher = Mesher(space)
         try:
             mesher.run()
@@ -80,11 +84,9 @@ class Scanner3D(Tkinter.Tk):
             logging.exception("\033[31mError during meshing of %s\033[0m" % (filename))
 
     def exportToObjFile(self, filename):
-        fp = open(filename, 'w')
-        for step in self.sceneRight:
-            for point in step:
-                fp.write('v %s %s %s\n' %(point.item(0), point.item(1), point.item(2)))
-        fp.close()
+        space = self.toVoxelSpace()
+        mesher = Mesher(space)
+        mesher.writeToObj(filename)
 
     def loadConfig(self):
         arduino = Arduino(self.config['Arduino']['port'],

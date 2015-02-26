@@ -21,9 +21,10 @@ def combine(Xrange, Yrange, Zrange):
 				yield (x, y, z)
 
 class Point:
-	def __init__(self, x=0, y=0, z=0, index=None):
+	def __init__(self, x=0, y=0, z=0, index=None, r=0x77, g=0x77, b=0x77):
 		self.xyz = np.array((x, y, z))
 		self.index = index
+		self.color = np.array((r, g, b))
 		self.hash = None
 
 	@property

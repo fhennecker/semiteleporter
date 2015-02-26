@@ -5,6 +5,7 @@ import numpy as np
 from .image import ImageProcessor
 from .pipeline import Pipeline
 from .douglaspeucker import reduce_pointset
+from mesher.voxel import Point
 
 
 class Camera:
@@ -49,7 +50,7 @@ class Camera:
             cam.release()
 
     def getPicture(self, name, toBuffer=False):
-        picture = None;
+        picture = None
         if(self.processDirectory == None):
             logging.info('Taking a picture')
  
@@ -88,8 +89,7 @@ class Scene:
         self.laser      = laser
         self.turntable  = turntable
         self.imageProcessor = ImageProcessor()
-        self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
-                                   self.getWorldPoint)
+        self.pipeline   = Pipeline(self.getWorldPoint)
         self.result = []
 
     def __iter__(self):
@@ -111,15 +111,19 @@ class Scene:
 
         self.imageProcessor.setCalibrationMask(imgLaserOn, imgLaserOff)
 
-    def getWorldPoint(self, cameraPoints, step):
+    def getWorldPoint(self, imgLaserOn, imgLaserOff, step):
         # Intersection of a line and a plane
         # line  : OP = camera.position + lambda * CP
         # plane : OP = laser.position  + alpha * v1  + beta * v2
         #
         # Solve camera.position - laser.position = -lambda * CP + alpha * v1 + beta * v2
 
+        cameraPoints = self.imageProcessor.extractPoints(imgLaserOn, imgLaserOff)
+
         worldPoints = []
         for pixel in cameraPoints:
+            pixel2D = tuple(map(int, pixel))
+
             # Move zero to image center
             pixel[0]=  pixel[0] - self.camera.shape[0]/2.0
             pixel[1]= -pixel[1] + self.camera.shape[1]/2.0
@@ -138,12 +142,17 @@ class Scene:
             # Translate P into turntable reference units and rotate it
             point = self.turntable.getRotationMatrix(step) * (point - self.turntable.position).T
 
+            p = Point()
+
             # Conserve only points on the table
             if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
-                worldPoints.append(np.array(point.T)[0])
+                x, z, y = np.array(point.T)[0]
+                # TODO: verify color channels order and indexes order
+                b, g, r = imgLaserOff[pixel2D[1]][pixel2D[0]]
+                worldPoints.append(Point(x=x, y=y, z=z, r=r, g=g, b=b))
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
-        return reduce_pointset(worldPoints, 5)
+        return reduce_pointset(worldPoints, 3)
 
     def runStep(self, step, isLastStep):
         if(step == 0):

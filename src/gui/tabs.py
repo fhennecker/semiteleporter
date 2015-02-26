@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-
+from mesher.voxel import Point
 
 class Tab(Tkinter.Frame):
     def __init__(self, rootTab, title=""):
@@ -175,11 +175,13 @@ class ViewerTab(Tab):
             thread_left.start()
             thread_right.start()
         else:
-            for item in scene:
-                points = np.array(item).T
-                if(len(points) != 0):
+            for slice in scene:
+                arrays = map(Point.toNPArray, slice[0])
+                
+                if(len(arrays) != 0):
+                    x, y, z = zip(*arrays)
                     lock.acquire()
-                    self.axis.scatter(points[0], points[2], points[1], c='b', marker='.', s=2)
+                    self.axis.scatter(x, y, z, c='b', marker='.', s=2)
                     self.graph.draw()
                     lock.release()
 

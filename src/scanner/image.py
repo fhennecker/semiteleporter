@@ -38,7 +38,6 @@ class ImageProcessor:
         mask = cv2.GaussianBlur(mask,(3,3),0)
         return cv2.inRange(mask, np.array([250]), np.array([255]))
         
-
     def massCenter(self, image):
         points = []
         for line in range(image.shape[0]):
