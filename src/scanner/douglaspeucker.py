@@ -52,7 +52,7 @@ def reduce_pointset(points, thres=1):
     if len(points) <= 2 or thres <= 0:
         return points
     # On ordonne les points verticalement
-    points.sort(key=lambda x: x[1])
+    points.sort(key=lambda x: x.toNPArray()[2])
     douglas_peucker(points, thres)
     return filter(lambda x: x is not None, points)
 
