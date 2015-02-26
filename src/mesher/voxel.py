@@ -257,6 +257,7 @@ class VoxelSpace:
 					return resList[1]
 				else:
 					continue
+		return None
 
 	def getHighestPoint(self):
 		return self.highestPoint
