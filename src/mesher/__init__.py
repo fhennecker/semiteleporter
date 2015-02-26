@@ -70,7 +70,17 @@ class Mesher:
         # its closest point too
         Q = self.points.closestPointTo(P, requiresDifferent=True)
         # we now have to find R which minimizes distance(R, P)+distance(Q, P)
-        R = self.points.closestPointToEdge(P,Q)
+        R = None
+        found = False
+        for newPoints in self.points.closestPointsToEdge(P, Q, 20):
+            if found:
+                break
+            for newPoint in newPoints:
+                if found:
+                    break
+                found = True
+                R = newPoint
+
 
         self.faces.add((P, Q, R))
 

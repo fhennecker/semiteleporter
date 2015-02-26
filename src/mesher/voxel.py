@@ -249,40 +249,14 @@ class VoxelSpace:
 			#            this list (we examine layers incrementally)
 			if points:
 				resList = sorted(points, key=point.distance)
+				if len(resList) == 0:
+					continue
 				if not requiresDifferent or (requiresDifferent and resList[0] != point):
 					return resList[0]
 				elif len(resList)>1:
 					return resList[1]
 				else:
-					return None
-
-	def closestPointToEdge(self, a, b, distanceLimit=10):
-		""" Finds the point p which minimizes distance(a,p)+distance(b,p) """
-		aVoxel = self.voxelIndexForPoint(a)
-		bVoxel = self.voxelIndexForPoint(b)
-		res = None
-		bestDistance = float("inf")
-
-		for point in self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel)):
-			# print "checking for", point
-			if point != a and point != b:
-				distance = point.distance(a)+point.distance(b)
-				if distance < bestDistance:
-					bestDistance = distance
-					res = point
-
-		# didn't find any point, start looking in layers around region
-		if not res:
-			layer = 1
-			while layer<distanceLimit and not res:
-				for point in self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer)):
-					distance = point.distance(a)+point.distance(b)
-					if distance < bestDistance:
-						bestDistance = distance
-						res = point
-				layer += 1
-
-		return res
+					continue
 
 	def getHighestPoint(self):
 		return self.highestPoint
