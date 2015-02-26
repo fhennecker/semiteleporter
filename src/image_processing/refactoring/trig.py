@@ -347,7 +347,7 @@ class PipelineStage(multiprocessing.Process):
                 logging.debug("Process '%s' put a result" %(self.method.__name__))
                 self.out_queue.put(res)
             except:
-                logging.error("Bad args format in PipelineStage '%s'" %(self.method.__name__))
+                logging.exception("Bad args format in PipelineStage '%s'" %(self.method.__name__))
             args = self.in_queue.get()
         self.out_queue.put(EndOfProcessing)
         logging.debug("Process '%s' down" %(self.method.__name__))
