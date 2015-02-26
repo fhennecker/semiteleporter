@@ -191,8 +191,7 @@ class Scene:
         self.turntable  = turntable
         self.imageProcessor = ImageProcessor()
         self.pipeline   = Pipeline(self.imageProcessor.extractPoints,
-                                   self.getWorldPoint,
-                                   self.simplify)
+                                   self.getWorldPoint)
         self.result = []
 
     def __iter__(self):
@@ -205,9 +204,6 @@ class Scene:
                 self.result += item
                 yield item
                 item = self.pipeline.get()
-
-    def simplify(self, points):
-        return reduce_pointset(points, 3)
 
     def calibration(self):
         self.laser.switch(True)
@@ -249,7 +245,7 @@ class Scene:
                 worldPoints.append(np.array(point.T)[0])
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
-        return worldPoints
+        return reduce_pointset(worldPoints, 3)
 
     def runStep(self, step, isLastStep):
         if(step == 0):
