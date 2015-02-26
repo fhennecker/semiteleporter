@@ -122,7 +122,7 @@ class Scene:
 
         worldPoints = []
         for pixel in cameraPoints:
-            originalPixel = pixel
+            pixel2D = tuple(map(int, pixel))
 
             # Move zero to image center
             pixel[0]=  pixel[0] - self.camera.shape[0]/2.0
@@ -147,7 +147,8 @@ class Scene:
             # Conserve only points on the table
             if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
                 x, z, y = np.array(point.T)[0]
-                b, g, r = imgLaserOff[originalPixel[0]][originalPixel[1]]
+                # TODO: verify color channels order and indexes order
+                b, g, r = imgLaserOff[pixel2D[1]][pixel2D[0]]
                 worldPoints.append(Point(x=x, y=y, z=z, r=r, g=g, b=b))
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
