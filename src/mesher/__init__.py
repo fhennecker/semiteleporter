@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from voxel import VoxelSpace, flatten, Point, norm3D
-from math import sqrt
+from voxel import VoxelSpace, Point, norm3D
 import Queue
 import numpy as np
-import traceback
 from sys import stdout
 
 class ObjParser:

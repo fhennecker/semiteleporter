@@ -1,5 +1,6 @@
 import logging
 import serial
+import time
 import numpy as np
 
 class Arduino:
