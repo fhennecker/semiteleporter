@@ -190,28 +190,28 @@ class Mesher:
                     if found:
                         break
                 
-                # Already has a face with this point
-                if self.hasFace(newPoint, a, b):
-                    continue
-                
-                # Point not in influence region (voxel sampling)
-                if not self.isInRegion(regionPoints, newPoint):
-                    continue
-                self.info("Add face", repr(a), repr(b), repr(newPoint))
-                
-                if not self.hasEdge(newPoint, a):
-                    self.activeEdges.put((newPoint, a))
-                else:
-                    self.info("Already has edge", repr(newPoint), repr(a))
-                if not self.hasEdge(newPoint, b):
-                    self.activeEdges.put((b, newPoint))
-                else:
-                    self.info("Already has edge", repr(newPoint), repr(b))
-                
-                self.setEdge(newPoint, a, b)
-                self.lastFace = (newPoint, a, b)
-                self.faces.add(self.lastFace)
-                found = True
+                    # Already has a face with this point
+                    if self.hasFace(newPoint, a, b):
+                        continue
+                    
+                    # Point not in influence region (voxel sampling)
+                    if not self.isInRegion(regionPoints, newPoint):
+                        continue
+                    self.info("Add face", repr(a), repr(b), repr(newPoint))
+                    
+                    if not self.hasEdge(newPoint, a):
+                        self.activeEdges.put((newPoint, a))
+                    else:
+                        self.info("Already has edge", repr(newPoint), repr(a))
+                    if not self.hasEdge(newPoint, b):
+                        self.activeEdges.put((b, newPoint))
+                    else:
+                        self.info("Already has edge", repr(newPoint), repr(b))
+                    
+                    self.setEdge(newPoint, a, b)
+                    self.lastFace = (newPoint, a, b)
+                    self.faces.add(self.lastFace)
+                    found = True
 
 
             if self.debug:
