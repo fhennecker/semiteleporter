@@ -143,7 +143,7 @@ class Scene:
                 worldPoints.append(np.array(point.T)[0])
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
-        return reduce_pointset(worldPoints, 3)
+        return reduce_pointset(worldPoints, 5)
 
     def runStep(self, step, isLastStep):
         if(step == 0):

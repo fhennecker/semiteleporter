@@ -5,7 +5,7 @@ import getopt
 import numpy as np
 from gui import Gui, Tkinter
 from scanner.config import Config
-from scanner.camera import Camera, Scene
+from scanner.scene import Camera, Scene
 from scanner.arduino import Arduino, TurnTable, Laser
 from mesher.voxel import VoxelSpace
 from mesher import Mesher
@@ -71,8 +71,7 @@ class Scanner3D(Tkinter.Tk):
         for scene in (self.sceneRight, self.sceneLeft):
             for step in scene:
                 for point in step:
-                    print point
-                    space.addPoint(point)
+                    space.addPoint((point[0], point[2], point[1]))
         mesher = Mesher(space)
         try:
             mesher.run()
@@ -88,6 +87,14 @@ class Scanner3D(Tkinter.Tk):
         fp.close()
 
     def loadConfig(self):
+        arduino = Arduino(self.config['Arduino']['port'],
+                          True if (self.directory == None) else False)
+
+        self.turntable = TurnTable(self.config['TurnTable']['position'],
+                                   self.config['TurnTable']['diameter'],
+                                   self.config['TurnTable']['steps'],
+                                   arduino)
+
         camera = Camera(self.config['Camera']['port'],
                         (self.config['Camera']['width'], self.config['Camera']['height']),
                         self.config['Camera']['position'],
@@ -96,13 +103,6 @@ class Scanner3D(Tkinter.Tk):
                         (self.config['File']['save'], self.config['File']['extension']),
                         self.directory)
 
-        arduino = Arduino(self.config['Arduino']['port'],
-                          True if (self.directory == None) else False)
-
-        self.turntable = TurnTable(self.config['TurnTable']['position'],
-                                   self.config['TurnTable']['diameter'],
-                                   self.config['TurnTable']['steps'],
-                                   arduino)
 
         # Assume that Laser point to the center of the turntable
         pos = self.config['LaserRight']['position']

@@ -13,7 +13,7 @@ class Arduino:
         if(isActive):
             try:
                 self.serialPort = serial.Serial(port, 115200)
-                time.sleep(2)
+                time.sleep(3)
                 self.command('P')
                 logging.debug("Handshaking with Arduino...")
             except:
@@ -86,9 +86,9 @@ class TurnTable:
 
     def getRotationMatrix(self, step):
         angle = self.stepAngle*step
-        rotationMatrix = np.matrix([[np.cos(angle), 0, -np.sin(angle)],
+        rotationMatrix = np.matrix([[ np.cos(angle), 0, np.sin(angle)],
                                     [0            , 1,              0],
-                                    [np.sin(angle), 0,  np.cos(angle)]])
+                                    [-np.sin(angle), 0, np.cos(angle)]])
         return rotationMatrix
         
     def rotate(self, step=1):

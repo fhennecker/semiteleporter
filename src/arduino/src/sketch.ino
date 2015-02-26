@@ -34,19 +34,16 @@ static const int afterTurnDelay = 150;
 static const int totalSteps = 8000;
 
 /* Change lasers state */
-void laser(bool left, bool right){
-  digitalWrite(laserLeftPin, left ? HIGH : LOW);
-  digitalWrite(laserRightPin, right ? HIGH : LOW);
+void laser(int laser_pin, bool value){
+  digitalWrite(laser_pin, value ? HIGH : LOW);
   delay(lightDelay);
 }
 
 void power(bool on){
   digitalWrite(powerPin, on ? HIGH : LOW);
-  delay(50);
 }
 
 /* Turn platform */
-int currentPos = 0;
 void turn(int n_steps=100){
   int half = n_steps/2;
   int increment = (stepDelayMax - stepDelayMin) / half;
@@ -57,19 +54,16 @@ void turn(int n_steps=100){
     delayMicroseconds(stepDelay);
     digitalWrite(stepPin, LOW);
     delayMicroseconds(stepDelay);
-    currentPos++;
     if (n_steps > half)
       stepDelay -= increment;
     else
       stepDelay += increment;
   }
   delay(afterTurnDelay);
-  currentPos %= totalSteps;
-  Serial.print(currentPos);
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(dirPin, OUTPUT);
   digitalWrite(dirPin, HIGH);
   pinMode(stepPin, OUTPUT);
@@ -89,21 +83,28 @@ void loop() {
     cmd = Serial.read();
     switch (cmd) {
       case '0':
-        laser(false, false);
+        laser(laserLeftPin, false);
+        laser(laserRightPin, false);
         break;
 
       case 'b':
       case 'B':
-        laser(true, true);
+        laser(laserLeftPin, true);
+        laser(laserRightPin, true);
         break;
 
       case 'l':
-      case 'L':
-        laser(true, false);
+        laser(laserLeftPin, false);
         break;
+      case 'L':
+        laser(laserLeftPin, true);
+        break;
+
       case 'r':
+        laser(laserRightPin, false);
+        break;
       case 'R':
-        laser(false, true);
+        laser(laserRightPin, true);
         break;
 
       case 't':

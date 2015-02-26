@@ -24,6 +24,7 @@ class Point:
 	def __init__(self, x=0, y=0, z=0, index=None):
 		self.xyz = np.array((x, y, z))
 		self.index = index
+		self.hash = None
 
 	@property
 	def x(self): return self.xyz[0]
@@ -54,7 +55,9 @@ class Point:
 		return not (self == other)
 
 	def __hash__(self):
-		return hash((self.x, self.y, self.z, self.index))
+		if self.hash is None:
+			self.hash = hash((self.x, self.y, self.z, self.index))
+		return self.hash
 
 	def __add__(self, other):
 		if isinstance(other, Point):
@@ -219,6 +222,20 @@ class VoxelSpace:
 		for vox in voxels:
 			for point in self.voxels.get(vox, []):
 				yield point
+
+	def closestPointsToEdge(self, a, b, distanceLimit):
+		""" Finds the k closest points to edge a, b, with a voxel distance limit """
+		aVoxel = self.voxelIndexForPoint(a)
+		bVoxel = self.voxelIndexForPoint(b)
+		distance = lambda p : norm3D(a-p) + norm3D(b-p)
+		eligible = lambda p : p not in (a, b)
+		points = self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel))
+		yield sorted(filter(eligible, points), key=distance)
+		
+		# didn't find any point in region, start looking in layers around region
+		for layer in range(1, distanceLimit):
+			points = self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer))
+			yield sorted(points, key=distance)
 
 	def closestPointTo(self, point, distanceLimit=10, requiresDifferent=False):
 		""" Finds and returns the closest point to (x, y z) 
