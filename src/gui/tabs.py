@@ -177,11 +177,11 @@ class ViewerTab(Tab):
         else:
             for slice in scene:
                 arrays = map(Point.toNPArray, slice[0])
-                
+                colors = map(lambda point: point.toRGB()/255.0, slice[0])
                 if(len(arrays) != 0):
                     x, y, z = zip(*arrays)
                     lock.acquire()
-                    self.axis.scatter(x, y, z, c='b', marker='.', s=2)
+                    self.axis.scatter(x, y, z, c=colors)
                     self.graph.draw()
                     lock.release()
 

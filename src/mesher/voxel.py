@@ -24,7 +24,7 @@ class Point:
 	def __init__(self, x=0, y=0, z=0, index=None, r=0x77, g=0x77, b=0x77):
 		self.xyz = np.array((x, y, z))
 		self.index = index
-		self.color = np.array((r, g, b))
+		self.color = np.array((r, g, b), dtype=np.float32)
 		self.hash = None
 
 	@property
@@ -72,6 +72,9 @@ class Point:
 
 	def toNPArray(self):
 		return self.xyz
+
+	def toRGB(self):
+		return self.color
 
 	def distance(self, other):
 		return norm3D(self - other)
