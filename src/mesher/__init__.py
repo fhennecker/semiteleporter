@@ -161,7 +161,10 @@ class Mesher:
         """
         a, b, c, unused, d, unused2 = regionBox
         matrix = np.array([b-a, c-a, d-a]).transpose()
-        l, m, g = np.linalg.solve(matrix, point.toNPArray()-a)
+        try:
+            l, m, g = np.linalg.solve(matrix, point.toNPArray()-a)
+        except np.linalg.LinAlgError:
+            return False # We might encounter a singular matrix
         return 0 < l <= 1 and 0 < m and 0 < g and m + g <= 1
 
     def isInnerEdge(self, a, b):
