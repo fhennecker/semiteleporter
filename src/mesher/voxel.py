@@ -24,7 +24,9 @@ class Point:
 	def __init__(self, x=0, y=0, z=0, index=None, r=0x77, g=0x77, b=0x77):
 		self.xyz = np.array((x, y, z))
 		self.index = index
-		self.color = np.array((r, g, b), dtype=np.float32)
+		if r > 1 or g > 1 or b > 1:
+			r, g, b = r/255., g/255., b/255.
+		self.color = np.array((r, g, b))
 		self.hash = None
 
 	@property
@@ -35,6 +37,11 @@ class Point:
 	
 	@property
 	def z(self): return self.xyz[2]
+
+	def toObjFormat(self):
+		x, y, z = self.xyz
+		r, g, b = self.color
+		return "v %f %f %f %f %f %f" % (x, y, z, r, g, b)
 
 	def __str__(self):
 		return "Point<"+str(self.x)+", "+str(self.y)+", "+str(self.z)+", #"+str(self.index)+">"

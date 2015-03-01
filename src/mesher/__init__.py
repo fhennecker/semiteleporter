@@ -56,9 +56,7 @@ class Mesher:
     def writeToObj(self, filename):
         with open(filename, 'w') as obj:
             for point in self.points.getSortedPoints():
-                x, y, z = point.toNPArray()
-                r, g, b = point.color/255.0
-                obj.write("v %f %f %f %f %f %f\n" % (x, y, z, r, g, b))
+                print >>obj, point.toObjFormat()
             for face in self.faces:
                 obj.write("f "+str(face[0].index)+" "+str(face[1].index)+" "+str(face[2].index)+"\n")
 

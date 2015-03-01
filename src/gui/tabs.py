@@ -177,7 +177,7 @@ class ViewerTab(Tab):
         else:
             for slice in scene:
                 arrays = map(Point.toNPArray, slice[0])
-                colors = map(lambda point: point.toRGB()/255.0, slice[0])
+                colors = map(Point.toRGB, slice[0])
                 if(len(arrays) != 0):
                     x, y, z = zip(*arrays)
                     lock.acquire()
