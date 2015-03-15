@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import time
 
 
 class ImageProcessor:
@@ -11,6 +12,7 @@ class ImageProcessor:
     def setCalibrationMask(self, foreground, background):
         mask = self.getLaserMask(foreground, background)
         self.calibrationMask = cv2.bitwise_not(mask)
+        cv2.imwrite("calib_%d.png" %time.time(), self.calibrationMask)
 
     def getRGBmask(self, imageDiff, R_threshold=10, GB_threshold=5):
         lower = np.array([0, 0, R_threshold], dtype=np.uint8)
@@ -44,8 +46,21 @@ class ImageProcessor:
             moments = cv2.moments(image[line,:,2])
             if(moments['m00'] != 0):
                 points.append([round(moments['m01']/moments['m00']), line])
+        return np.array(points)
 
-        return points
+    def getYBeetween(self, points, limit):
+        y = (points.T)[1]
+        return points[(limit[0]<y) & (y<limit[1])]
+
+    def linearRegression(self, points):
+        x,y = points.T
+        param = np.linalg.lstsq(np.array([y, np.ones(y.shape)]).T, x)[0]
+        return param
+
+    def interserctLines(self, line_1, line_2):
+        y = (line_1[1]-line_2[1])/(line_2[0]-line_1[0])
+        x = y*line_1[0]+line_1[1]
+        return x,y
 
     def extractPoints(self, imgLaserOn, imgLaserOff):
         mask = cv2.bitwise_and(self.getLaserMask(imgLaserOn, imgLaserOff), self.calibrationMask)
