@@ -1,0 +1,82 @@
+/**
+\mainpage Project "Ball Pivoting" documentation
+
+\author Julie Digne julie.digne@liris.cnrs.fr
+\version 1.0
+
+\section intro_sec Introduction
+This program performs triangular mesh reconstruction from a set of oriented 3D points given by their coordinates and oriented normals.
+It is an implementation of the Ball Pivoting Algorithm (BPA) [Bernardini et al. 1999]. The main difference with the paper lies in the parallel approach taken here. 
+BPA is a very elegant and efficient reconstruction method that uses a ball pivoting around triangle edges and adds new triangles if the ball is incident to three points and contains no other points.
+See the paper for details and theoretical foundations of the BPA, see [reference IPOL] for a detailed explanation of this precise parallel implementation, with timings and experiments.
+
+\section tools_subsec Dependencies:
+This program needs only the Standard Template Library (g++4.7.3 or higher) and 
+is parallelized using OpenMP (version 3.1 or higher). 
+
+\section install_sec Installation
+1 - unzip the archive <BR>
+2 - cd BallPivoting<BR>
+3 - in CMakeLists.txt set the path to g++ and/or clang (lines "CXX=")<BR>
+    line 21: SET (CMAKE_CXX_COMPILER "/usr/bin/g++")<BR>
+    line 26: SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")<BR>
+4 - mkdir build <BR>
+5 - cd build <BR>
+6 - cmake -DCMAKE_BUILD_TYPE=Release ..<BR>
+7 - make <BR>
+<BR>
+Note on the compilers:<BR>
+If your system default compiler is g++, you can comment line 21. 
+The program was compiled both with g++4.4 and 4.7 on debian and ubuntu and 
+g++4.8 and 4.2 on MacOSX 10.6.8. The code can also be compiled with clang by 
+using: cmake option -DUSE_CLANG=ON . Yet in that case there will be no support 
+for OpenMP and thus no paralellism.
+
+
+\section Running
+A typical usage for this program is <BR>
+
+ballpivoting -i \<input_file.txt\> -o \<output_file.ply\> -r \<radius\> -p <BR>
+
+where: <BR>
+ ** (-i) (mandatory) input_file.txt is a file containing the oriented points. It should be formatted as a simple ascii file, with one point per line separated by tabulations <BR>
+ x1	y1	z1	nx1	ny1	nz1 <BR>
+ x2	y2	z2	nx2	ny2	nz2 <BR>
+ .... <BR>
+ xn	yn	zn	nxn	nyn	nzn <BR>
+ ** (-o) (mandatory) output_file.ply contains the output reconstructed surface. The format is the Stanford PLY format (ascii). <BR>
+ ** (-r) (recommended) a single radius or a list of radii that will be used successively to reconstruct the surface, successive radii should be given as "r1 r2 ... rn"  <BR>
+ ** (-d) Alternatively you can set an octree depth instead of a radius with the option -d (bear in mind that excessive octree depths will cause memory swaps) <BR>
+ ** (-p) (recommended) will perform the computation in parallel.  <BR>
+  <BR>
+Example: <BR>
+ <BR>
+ballpivoting -i bunny_oriented.txt -o bunny_rec.ply -r "0.0003 0.0005 0.002" -p<BR>
+
+\section Copyright
+This project implements an algorithm possibly linked to the patent US6968299B1.<BR>
+This project is made available for the exclusive aim of serving as
+scientific tool to verify the soundness and completeness of the
+algorithm description. Compilation, execution and redistribution
+of this file may violate patents rights in certain countries.
+The situation being different for every country and changing
+over time, it is your responsibility to determine which patent
+rights restrictions apply to you before you compile, use,
+modify, or redistribute this file. A patent lawyer is qualified
+to make this determination.<BR>
+If and only if they don't conflict with any patent terms, you
+can benefit from the following license terms attached to this
+file.<BR>
+This program is free software: you can redistribute it and/or
+modify it under the terms of the GNU General Public License as published 
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/><BR>
+<BR><BR>
+
+ */

@@ -19,6 +19,7 @@ Package name for Debian (Ubuntu, Mint, ...) in brackets
     sudo apt-get update
     sudo apt-get install tk-dev libpng-dev libffi-dev dvipng texlive-latex-base python-tk python-dev python-imaging-tk python-pip
     sudo pip install numpy matplotlib pyopencv
+    ./install-ballpivoting.sh
 
 ### Run
 
