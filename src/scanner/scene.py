@@ -121,6 +121,10 @@ class Scene:
         cameraPoints = self.imageProcessor.extractPoints(imgLaserOn, imgLaserOff)
 
         worldPoints = []
+        maxRadius = (self.turntable.diameter/2)**2
+
+        rotMatrix = self.turntable.getRotationMatrix(step)
+
         for pixel in cameraPoints:
             pixel2D = tuple(map(int, pixel))
 
@@ -139,20 +143,28 @@ class Scene:
 
             point = self.camera.position + solution.A1[0] * CP.T
 
+            # Normal is laser-point translated in turntable system
+            normal = rotMatrix * (self.laser.position - point).T
+
             # Translate P into turntable reference units and rotate it
-            point = self.turntable.getRotationMatrix(step) * (point - self.turntable.position).T
+            point = rotMatrix * (point - self.turntable.position).T
 
             p = Point()
 
             # Conserve only points on the table
-            if(point[1]>0.5 and (point[0]**2+point[2]**2)<(self.turntable.diameter/2)**2):
+            if point[1] > 0.5 and (point[0]**2 + point[2]**2) < maxRadius:
                 x, z, y = np.array(point.T)[0]
+                nx, ny, nz = np.array(normal.T)[0]
                 # TODO: verify color channels order and indexes order
                 b, g, r = imgLaserOff[pixel2D[1]][pixel2D[0]]
-                worldPoints.append(Point(x=x, y=y, z=z, r=r, g=g, b=b))
+                worldPoints.append(Point(
+                    x=x, y=y, z=z, 
+                    r=r, g=g, b=b, 
+                    nx=nx, ny=ny, nz=nz
+                ))
                 #logging.debug("%s -> %s" % (str(pixel),str(point.T)))
         
-        return reduce_pointset(worldPoints, 3)
+        return reduce_pointset(worldPoints, 2)
 
     def runStep(self, step, isLastStep):
         if(step == 0):

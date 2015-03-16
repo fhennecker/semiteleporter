@@ -21,13 +21,17 @@ def combine(Xrange, Yrange, Zrange):
 				yield (x, y, z)
 
 class Point:
-	def __init__(self, x=0, y=0, z=0, index=None, r=0x77, g=0x77, b=0x77):
+	def __init__(self, x=0, y=0, z=0, index=None, r=0x77, g=0x77, b=0x77, nx=0, ny=0, nz=0):
 		self.xyz = np.array((x, y, z))
 		self.index = index
 		if r > 1 or g > 1 or b > 1:
 			r, g, b = r/255., g/255., b/255.
 		self.color = np.array((r, g, b))
 		self.hash = None
+		self.normal = np.array([nx, ny, nz])
+		normalNorm = norm3D(self.normal)
+		if normalNorm > 0:
+			self.normal /= normalNorm
 
 	@property
 	def x(self): return self.xyz[0]
@@ -41,7 +45,8 @@ class Point:
 	def toObjFormat(self):
 		x, y, z = self.xyz
 		r, g, b = self.color
-		return "v %f %f %f %f %f %f" % (x, y, z, r, g, b)
+		nx, ny, nz = self.normal
+		return "v %f %f %f %f %f %f\nvn %f %f %f" % (x, y, z, r, g, b, nx, ny, nz)
 
 	def __str__(self):
 		return "Point<"+str(self.x)+", "+str(self.y)+", "+str(self.z)+", #"+str(self.index)+">"

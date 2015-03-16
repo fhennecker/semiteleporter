@@ -9,6 +9,8 @@ from scanner.scene import Camera, Scene
 from scanner.arduino import Arduino, TurnTable, Laser
 from mesher.voxel import VoxelSpace
 from mesher import Mesher
+from mesher.vtkdelaunay3D import delaunay3D
+from mesher.bpa import meshBPA
 
 class Scanner3D(Tkinter.Tk):
     def __init__(self, args):
@@ -74,6 +76,14 @@ class Scanner3D(Tkinter.Tk):
                     space.addPoint(point)
         return space
 
+    def meshDelaunay3D(self, filename):
+        delaunay3D(self.toVoxelSpace().allPoints(), filename)
+        self.gui.popUpConfirm('Meshing', 'Meshing with delaunay3D finished')
+
+    def meshBPA(self, filename):
+        meshBPA(self.toVoxelSpace().allPoints(), filename)
+        self.gui.popUpConfirm('Meshing', 'Meshing with BPA finished')
+
     def meshToObjFile(self, filename):
         space = self.toVoxelSpace()
         mesher = Mesher(space)
@@ -82,6 +92,7 @@ class Scanner3D(Tkinter.Tk):
             mesher.writeToObj(filename)
         except:
             logging.exception("\033[31mError during meshing of %s\033[0m" % (filename))
+        self.gui.popUpConfirm('Meshing', 'Meshing finished')
 
     def exportToObjFile(self, filename):
         space = self.toVoxelSpace()
@@ -154,6 +165,7 @@ class Scanner3D(Tkinter.Tk):
                 self.sceneRight.runStep(step, True if(step==self.turntable.nSteps-1) else False)
                 self.turntable.rotate()
                 logging.info('Step %d done', step+1)
+            self.arduino.powerOff()
 
             logging.info('\033[92m Scanning DONE \033[0m')
 

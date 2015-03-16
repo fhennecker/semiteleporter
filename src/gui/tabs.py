@@ -147,12 +147,14 @@ class ViewerTab(Tab):
         Tkinter.Button(frame, text="Start", command=self.start).grid(row=0, column=0)
         Tkinter.Button(frame, text="Export", command=self.export).grid(row=1, column=0)
         Tkinter.Button(frame, text="Mesh", command=self.mesh).grid(row=2, column=0)
-        Tkinter.Button(frame, text="Quit", command=self.winfo_toplevel().destroy).grid(row=3, column=0)
+        Tkinter.Button(frame, text="Mesh with Delaunay3D", command=self.meshDelaunay).grid(row=3, column=0)
+        Tkinter.Button(frame, text="Mesh with BPA", command=self.meshBPA).grid(row=4, column=0)
+        Tkinter.Button(frame, text="Quit", command=self.winfo_toplevel().destroy).grid(row=5, column=0)
 
-    def _objSaveDialog(self):
+    def _objSaveDialog(self, extension=".obj"):
         filename, ext = None, None
-        while ext != ".obj" and filename != '':
-            filename = tkFileDialog.asksaveasfilename(defaultextension=".obj")
+        while ext != extension and filename != '':
+            filename = tkFileDialog.asksaveasfilename(defaultextension=extension)
             ext = os.path.splitext(filename)[-1]
         return filename
 
@@ -189,3 +191,13 @@ class ViewerTab(Tab):
         filename = self._objSaveDialog()
         if filename != "":
             self.scanner.meshToObjFile(filename)
+
+    def meshDelaunay(self):
+        filename = self._objSaveDialog()
+        if filename != "":
+            self.scanner.meshDelaunay3D(filename)
+
+    def meshBPA(self):
+        filename = self._objSaveDialog(".ply")
+        if filename != "":
+            self.scanner.meshBPA(filename)
