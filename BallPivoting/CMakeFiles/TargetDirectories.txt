@@ -1,1 +1,0 @@
-/home/titou/semiteleporter/BallPivoting/CMakeFiles/ballpivoting.dir
