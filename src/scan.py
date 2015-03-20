@@ -165,8 +165,8 @@ class Scanner3D(Tkinter.Tk):
 
         left_line = self.linearRegression(left_line)
         right_line = self.linearRegression(right_line)
-        logging.debug("[CALIBRATION] left line  : %.2f*x+%.2f" %(left_line[0], left_line[1]))
-        logging.debug("[CALIBRATION] right line : %.2f*x+%.2f" %(right_line[0], left_line[1]))
+        logging.debug("[CALIBRATION] left line  : %.2f*x+%.2f" %(-left_line[0], left_line[1]))
+        logging.debug("[CALIBRATION] right line : %.2f*x+%.2f" %(-right_line[0], left_line[1]))
 
         center = self.interserctLines(left_line, right_line)
         logging.debug("[CALIBRATION] center @ %s" %(center,))

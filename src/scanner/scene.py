@@ -53,14 +53,12 @@ class Camera:
             currentUnitVect[0], # x"
             origUnitVect[0],    # x
             -origUnitVect[2])   # -z        
-        Yzx = 0
         logging.debug('Yzx = %5.2f' % np.degrees(Yzx))
 
         Xyz = self.getAngle(
             currentUnitVect[1], # y"
             origUnitVect[1],    # y
             -origUnitVect[0]*np.sin(Yzx)-origUnitVect[2]*np.cos(Yzx)) # x*sin(Yzx)+z*cos(Yzx)
-        Xyz = np.radians(19.0)
         logging.debug('Xyz = %5.2f' % np.degrees(Xyz))
 
         # Rotate first around Y/vertical axis, then X/horizontal axis
