@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from voxel import VoxelSpace, Point, norm3D
+from math import sqrt
 import Queue
 import numpy as np
 from sys import stdout
@@ -12,8 +13,7 @@ class ObjParser:
             self.points = []
             for line in obj.readlines():
                 if line[0:2] == "v ":
-                    self.points.append(map(float, line[1:].split()))
-
+                    self.points.append(map(float, line[2:].split()[:3]))
 
 class Mesher:
     def __init__(self, voxelSpace, debug=False):
@@ -27,6 +27,7 @@ class Mesher:
     def run(self):
         self.findSeedTriangle()
         self.growRegion()
+        self.postProcess()
 
     def info(self, *msg):
         msg = ('[%4d faces]' % (len(self.faces)),) + msg
@@ -58,7 +59,8 @@ class Mesher:
             for point in self.points.getSortedPoints():
                 print >>obj, point.toObjFormat()
             for face in self.faces:
-                obj.write("f "+str(face[0].index)+" "+str(face[1].index)+" "+str(face[2].index)+"\n")
+                v = [face[i].index for i in range(3)]
+                print >>obj, "f %d//%d %d//%d %d//%d" % (v[0], v[0], v[1], v[1], v[2], v[2])
 
     def findSeedTriangle(self):
         """ Builds the first triangle PQR in order to start region growing """
@@ -223,7 +225,6 @@ class Mesher:
                     self.faces.add(self.lastFace)
                     found = True
 
-
             if self.debug:
                 self.writeToObj("test.obj")
                 nPoints = self.points.numberOfPoints()
@@ -235,8 +236,30 @@ class Mesher:
                     print>> lalala, "f %d %d %d" % (2+nPoints, 1+nPoints, 5+nPoints,)
                     print>> lalala, "f %d %d %d" % (2+nPoints, 5+nPoints, 6+nPoints,)
         self.info("Finished")
-
         print
+
+    def postProcess(self, z=2.58):
+        """
+        Remove all triangles that have an edge whose length is outside the z
+        value of a normal estimation of the edges length
+        @param z The z value to use (1.96=95%, 2.58=99%, ...)
+        """
+
+        # [(p1, p2, p3), ...]
+        faces = list(self.faces)
+        # Edges lens
+        edges = [[norm3D(f[i] - f[i-1]) for i in range(3)] for f in faces]
+
+        # Edge length mean
+        mu = sum(map(sum, edges)) / (3*len(edges))
+        # Edge length std deviation
+        sigma = sqrt(sum(map(lambda e: sum((x-mu)**2 for x in e), edges)) / (3*len(edges)))
+
+        edgeOK = lambda e: abs(e-mu) < (z*sigma)
+        faceOK = lambda f: edgeOK(f[0]) and edgeOK(f[1]) and edgeOK(f[2])
+        faceOKIndexes = filter(lambda i: faceOK(edges[i]), xrange(len(faces)))
+        self.faces = set(map(faces.__getitem__, faceOKIndexes))
+
 
 if __name__ == "__main__":
     from sys import argv
@@ -246,3 +269,5 @@ if __name__ == "__main__":
     vs.addPoints(op.points)
     print vs
     mesher = Mesher(vs, debug=(len(argv) > 3))
+    mesher.run()
+    mesher.writeToObj("meshed.obj")
