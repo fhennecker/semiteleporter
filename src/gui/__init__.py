@@ -1,6 +1,7 @@
 import logging
 import Tkinter, ttk, tkMessageBox
 from tabs import ViewerTab, SetupTab
+import cv2
 
 
 class Gui(Tkinter.Tk):

@@ -41,7 +41,7 @@ class Arduino:
 
 
 class Laser:
-    def __init__(self, pin, position, yAngle, arduino):
+    def __init__(self, pin, arduino):
         """ Create a new Laser object
         pin      = number of the pin connected to the arduino
         position = [X, Y, Z], laser position
@@ -49,12 +49,19 @@ class Laser:
         arduino  = the arduino interface
         """
 
-        logging.debug("Create laser @ %s, yAngle=%.2f, pin=%s" % (position, yAngle, pin))
+        logging.debug("Create laser on pin %s" %(pin))
 
         self.pin      = pin
-        self.position = np.array(position, dtype=np.float32)
-        self.yAngle   = yAngle
         self.arduino  = arduino
+        self.position = None
+        self.yAngle   = None
+        self.v1       = None
+        self.v2       = None
+
+    def calibrate(self, position, yAngle):
+        logging.debug("Calibrate laser on pin %s @(%.2f, %.2f, %.2f), yAngle=%.2f" %(self.pin, position[0], position[1], position[2], np.degrees(yAngle)))
+        self.yAngle = yAngle
+        self.position = position
         self.v1       = np.array([0,1,0], dtype=np.float32)
         self.v2       = np.array([-np.sin(self.yAngle), 0, np.cos(self.yAngle)], dtype=np.float32)
 

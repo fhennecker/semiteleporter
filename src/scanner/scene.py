@@ -9,7 +9,7 @@ from mesher.voxel import Point
 
 
 class Camera:
-    def __init__(self, port, shape, position, rotation, viewAngle, save, processDirectory=None):
+    def __init__(self, port, shape, position, viewAngle, save, processDirectory=None):
         """ Create a new Camera object
         port      = path to the camera
         shape     = (W,H), camera shape Width x Heigth
@@ -20,34 +20,66 @@ class Camera:
         processDirectory = path to the directory of pictures to process (when don't use the scanner)
         """
 
-        logging.debug("Create Camera (%.2f, %.2f) %s @ %s, viewAngle = %.2f, rotation = %s" %(shape[0], shape[1], port, position, viewAngle, rotation))
+        logging.debug("Create Camera %s (%.2f, %.2f) @ %s, viewAngle = %.2f" %(port, shape[0], shape[1], position, viewAngle))
 
         self.camId     = int(port[-1])
         self.shape     = shape
         self.position  = np.array(position, dtype=np.float32)
         self.distance  = float(shape[0]/2)/np.tan(np.radians(viewAngle)/2)
-        self.rotation  = np.radians(np.array(rotation, dtype=np.float32))
+        self.rotation  = None
         self.save      = save
         self.processDirectory = processDirectory
         self.buffered  = ("", None)
-
-        # First Rotate around Y/vertical axis
-        self.rotationMatrix = np.matrix([[np.cos(self.rotation[1]), 0, -np.sin(self.rotation[1])],
-                                         [0                       , 1,  0                       ],
-                                         [np.sin(self.rotation[1]), 0,  np.cos(self.rotation[1])]])
-        # Then Rotate around X/horizontal axis
-        self.rotationMatrix *= np.matrix([[1, 0                       ,  0                       ],
-                                          [0, np.cos(self.rotation[0]), -np.sin(self.rotation[0])],
-                                          [0, np.sin(self.rotation[0]),  np.cos(self.rotation[0])]])
-        # Then Rotate around Z/depth axis
-        self.rotationMatrix *= np.matrix([[np.cos(self.rotation[2]), -np.sin(self.rotation[2]), 0],
-                                          [np.sin(self.rotation[2]),  np.cos(self.rotation[2]), 0],
-                                          [0                      ,  0                        , 1]])
+        self.rotationMatrix = np.matrix(np.eye(3))
 
         if(self.processDirectory == None):
             cam = cv2.VideoCapture(self.camId)
             cam.read()
             cam.release()
+
+    def calibrate(self, turnTable, (x,y)):
+        ''' Compute Camera rotation from expected and observed turnTable (x,y) center
+            Rotation around the Z-axis is not supported
+        '''
+        # Unit vector pointing to the original turntable center
+        origUnitVect = turnTable.position - self.position
+        origUnitVect /= np.linalg.norm(origUnitVect)
+
+        # Unit vector pointing to the current turntable center
+        currentUnitVect = np.array([x,y,self.distance], dtype=float)
+        currentUnitVect /= np.linalg.norm(currentUnitVect)
+
+        Yzx = self.getAngle(
+            currentUnitVect[0], # x"
+            origUnitVect[0],    # x
+            -origUnitVect[2])   # -z        
+        Yzx = 0
+        logging.debug('Yzx = %5.2f' % np.degrees(Yzx))
+
+        Xyz = self.getAngle(
+            currentUnitVect[1], # y"
+            origUnitVect[1],    # y
+            -origUnitVect[0]*np.sin(Yzx)-origUnitVect[2]*np.cos(Yzx)) # x*sin(Yzx)+z*cos(Yzx)
+        Xyz = np.radians(19.0)
+        logging.debug('Xyz = %5.2f' % np.degrees(Xyz))
+
+        # Rotate first around Y/vertical axis, then X/horizontal axis
+        self.rotationMatrix = np.matrix([[ np.cos(Yzx),             0,           -np.sin(Yzx)            ],
+                                         [-np.sin(Xyz)*np.sin(Yzx), np.cos(Yzx), -np.sin(Xyz)*np.cos(Yzx)],
+                                         [ np.cos(Xyz)*np.sin(Yzx), np.sin(Xyz),  np.cos(Xyz)*np.cos(Yzx)]])
+
+
+    def getAngle(self, a, b, c):
+        ''' Solve a = b*cos(angle)+c*sin(angle) equation with angle [-pi/2:pi/2]
+        '''
+        # Above equation is equivalent to:
+        #     a/norm([b,c]) = cos(u)*cos(angle)+ sin(u)*sin(angle)
+        u = np.arcsin(c/np.linalg.norm((b,c)))
+        # or  a/norm([b,c]) = cos(u-angle)
+        # or  angle = u - acos(a/norm([b,c])
+        angle = u-np.arccos(a/np.linalg.norm((b,c)))
+        return ((angle + np.pi/2) % np.pi) - np.pi/2
+
 
     def getPicture(self, name, toBuffer=False):
         picture = None
@@ -77,7 +109,7 @@ class Camera:
 
 
 class Scene:
-    def __init__(self, name, camera, laser, turntable):
+    def __init__(self, name, camera, laser, turnTable):
         """ Create a new scene object
         name   = the name of the scene for pictures names
         camera = the camera object of the scene
@@ -87,7 +119,7 @@ class Scene:
         self.name       = name
         self.camera     = camera
         self.laser      = laser
-        self.turntable  = turntable
+        self.turnTable  = turnTable
         self.imageProcessor = ImageProcessor()
         self.pipeline   = Pipeline(self.getWorldPoint)
         self.result = []
@@ -103,13 +135,41 @@ class Scene:
                 yield item
                 item = self.pipeline.get()
 
-    def calibration(self):
+    def calibrateBackground(self):
         self.laser.switch(True)
         imgLaserOn = self.camera.getPicture("calibration_"+self.name)
         self.laser.switch(False)
         imgLaserOff = self.camera.getPicture("calibration_off", True)
 
-        self.imageProcessor.setCalibrationMask(imgLaserOn, imgLaserOff)
+        return self.imageProcessor.setCalibrationMask(imgLaserOn, imgLaserOff)
+
+    def calibrateLaser(self, (x,y), m):
+        ''' Compute Laser position and angle from the slope of the laser line on the
+            screen and turntable position. This method should be executed after Camera
+            calibration to make sure that its rotation matrix is correctly set.
+            turnTable = turntable object
+            (x,y)     = position of the turntable center (laser line should intersect it)
+            m         = slope of the laser line (y=mx+p) on the screen
+        '''
+
+        # Define a plane based on the laser line on the screen ...
+        laserLineVect = np.array([1, m, 0], dtype=float)
+        # ... and the ray pointing to the turntable center (laser line should intersect it)
+        turnTableVect = np.array([x,y,self.camera.distance], dtype=float)
+        # A plane is described by the following equation a*x+b*y+c*z+d=0
+        # (a,b,c) is the cross product of the two director vectors define above
+        abcVect = np.cross(laserLineVect, turnTableVect)
+        # Rotate vector in world reference as they were defined in Camera reference
+        abcVect = (self.camera.rotationMatrix * np.matrix(abcVect).T).A1
+        # d is defined by forcing the plane to pass by the camera position
+        d       = -np.dot(abcVect, self.camera.position)
+        # Intersection of that plane with the Xaxis (a*x+b*turnTable.y+c*0+d=0) is the laser position
+        laserX     = -(d+abcVect[1]*self.turnTable.position[1])/abcVect[0]
+        # Compute laser angle in (radian) assuming it intersects the turntable center
+        laserAngle = np.arctan(laserX/self.turnTable.position[2])
+
+        self.laser.calibrate(np.array([laserX, self.camera.position[1], 0.0], dtype=np.float32), laserAngle)
+
 
     def getWorldPoint(self, imgLaserOn, imgLaserOff, step):
         # Intersection of a line and a plane
@@ -121,9 +181,9 @@ class Scene:
         cameraPoints = self.imageProcessor.extractPoints(imgLaserOn, imgLaserOff)
 
         worldPoints = []
-        maxRadius = (self.turntable.diameter/2)**2
+        maxRadius = (self.turnTable.diameter/2)**2
 
-        rotMatrix = self.turntable.getRotationMatrix(step)
+        rotMatrix = self.turnTable.getRotationMatrix(step)
 
         for pixel in cameraPoints:
             pixel2D = tuple(map(int, pixel))
@@ -147,7 +207,7 @@ class Scene:
             normal = rotMatrix * (self.laser.position - point).T
 
             # Translate P into turntable reference units and rotate it
-            point = rotMatrix * (point - self.turntable.position).T
+            point = rotMatrix * (point - self.turnTable.position).T
 
             p = Point()
 
