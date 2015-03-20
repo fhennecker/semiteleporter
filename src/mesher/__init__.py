@@ -185,7 +185,6 @@ class Mesher:
             # Already inner edge; skip
             if self.isInnerEdge(a, b):
                 continue
-            self.info("Find triangle from edge", repr(a), repr(b))
 
             # Find influence region bounding (extruded triangle)
             regionPoints = self.influenceRegion(a,b)
@@ -213,12 +212,8 @@ class Mesher:
                     
                     if not self.hasEdge(newPoint, a):
                         self.activeEdges.put((newPoint, a))
-                    else:
-                        self.info("Already has edge", repr(newPoint), repr(a))
                     if not self.hasEdge(newPoint, b):
                         self.activeEdges.put((b, newPoint))
-                    else:
-                        self.info("Already has edge", repr(newPoint), repr(b))
                     
                     self.setEdge(newPoint, a, b)
                     self.lastFace = (newPoint, a, b)
@@ -259,6 +254,8 @@ class Mesher:
         faceOK = lambda f: edgeOK(f[0]) and edgeOK(f[1]) and edgeOK(f[2])
         faceOKIndexes = filter(lambda i: faceOK(edges[i]), xrange(len(faces)))
         self.faces = set(map(faces.__getitem__, faceOKIndexes))
+        self.info("Keep edges in %d..%dmm" % (max(0, mu - z*sigma), mu + z*sigma))
+        print
 
 
 if __name__ == "__main__":
