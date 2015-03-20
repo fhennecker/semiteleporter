@@ -110,29 +110,78 @@ class Scanner3D(Tkinter.Tk):
                                    self.config['TurnTable']['steps'],
                                    arduino)
 
-        camera = Camera(self.config['Camera']['port'],
+        self.camera = Camera(self.config['Camera']['port'],
                         (self.config['Camera']['width'], self.config['Camera']['height']),
                         self.config['Camera']['position'],
-                        self.config['Camera']['rotation'],
                         self.config['Camera']['viewangle'],
                         (self.config['File']['save'], self.config['File']['extension']),
                         self.directory)
 
-
         # Assume that Laser point to the center of the turntable
-        pos = self.config['LaserRight']['position']
-        laserRight = Laser(self.config['LaserRight']['pin'],
-                           pos,
-                           np.arctan(pos[0]/self.turntable.position[2]),
-                           arduino)
-        self.sceneRight = Scene("right", camera, laserRight, self.turntable)
+        laserRight = Laser(self.config['LaserRight']['pin'], arduino)
+        self.sceneRight = Scene("right", self.camera, laserRight, self.turntable)
 
-        pos = self.config['LaserLeft']['position']
-        laserLeft = Laser(self.config['LaserLeft']['pin'],
-                          pos,
-                          np.arctan(pos[0]/self.turntable.position[2]),
-                          arduino)
-        self.sceneLeft  = Scene("left", camera, laserLeft,  self.turntable)    
+        laserLeft = Laser(self.config['LaserLeft']['pin'], arduino)
+        self.sceneLeft  = Scene("left", self.camera, laserLeft,  self.turntable)    
+
+
+    def getCalibrationLimits(self, left, right):
+        dist = left[0][0] - right[0][0]
+        limit = left[0][1]
+
+        for idx in range(len(left)):
+            for offset in range(max(0,idx-20),min(len(right),idx+20)):
+                x_dist = right[offset][0]-left[idx][0]
+                if(x_dist >= 0):
+                    x_dist = np.sqrt(np.square(x_dist) + np.square(right[offset][1]-left[idx][1]))
+                    if(x_dist<=dist):
+                        dist = x_dist
+                        limit = min(right[offset][1],left[idx][1])
+        return (limit, limit+self.camera.shape[1]/10)
+
+    def getBetween(self, points, limits):
+        y = (points.T)[1]
+        return points[(limits[0]<y) & (y<limits[1])]
+
+    def linearRegression(self, points):
+        x,y = points.T
+        param = np.linalg.lstsq(np.vstack([x, np.ones(y.shape)]).T, y)[0]
+        return param
+
+    def interserctLines(self, line_1, line_2):
+        x = int(round((line_1[1]-line_2[1])/(line_2[0]-line_1[0]),0))
+        y = int(round(x*line_1[0]+line_1[1],0))
+        return x,y
+
+    def calibration(self):
+        logging.info('\033[94m Start calibration (free the table)...\033[0m')
+        self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
+        
+        left_line = self.sceneLeft.calibrateBackground()
+        right_line = self.sceneRight.calibrateBackground()
+
+        limits = self.getCalibrationLimits(left_line, right_line)
+        logging.debug("[CALIBRATION] y limits : %s" %(limits,))
+        left_line = self.getBetween(left_line, limits)
+        right_line = self.getBetween(right_line, limits)
+
+        left_line = self.linearRegression(left_line)
+        right_line = self.linearRegression(right_line)
+        logging.debug("[CALIBRATION] left line  : %.2f*x+%.2f" %(left_line[0], left_line[1]))
+        logging.debug("[CALIBRATION] right line : %.2f*x+%.2f" %(right_line[0], left_line[1]))
+
+        center = self.interserctLines(left_line, right_line)
+        logging.debug("[CALIBRATION] center @ %s" %(center,))
+
+        # Move zero to image center
+        center = (center[0] - self.camera.shape[0]/2.0, self.camera.shape[1]/2.0 - center[1])
+
+        self.camera.calibrate(self.turntable, center)
+        self.sceneLeft.calibrateLaser(center, -left_line[0])
+        self.sceneRight.calibrateLaser(center, -right_line[0])
+        logging.info('\033[94m Calibration done. (place your object on the table)\033[0m')
+        self.gui.popUpConfirm('Calibration', 'Calibration : Place object and press OK...')
+
 
     def run(self):
         if(self.arduino != None):
@@ -145,20 +194,7 @@ class Scanner3D(Tkinter.Tk):
         if(not self.thread.isAlive()):
             self.loadConfig()
             logging.info('\t\033[92m----- Start scanning -----\033[0m')
-
-            logging.info('\033[94m Calibration : free the table and press ENTER...\033[0m')
-            if(self.gui == None):
-                raw_input('')
-            else:
-                self.gui.popUpConfirm('Calibration', 'Calibration : free the table and press OK...')
-            self.sceneLeft.calibration()
-            self.sceneRight.calibration()
-            logging.info('\033[94m Calibration : done, place your object on the table and press ENTER...\033[0m')
-            if(self.gui == None):
-                raw_input('')
-            else:
-                self.gui.popUpConfirm('Calibration', 'Calibration : Place object and press OK...')
-
+            self.calibration()
             self.thread = threading.Thread(target=self.startScan, args=(False,))
             self.thread.start()
         elif(not startThread):
