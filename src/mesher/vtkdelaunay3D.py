@@ -3,6 +3,7 @@
 import optparse
 import vtk
 import tempfile
+import voxel
 
 
 """ Readme :
@@ -14,7 +15,7 @@ important parameter alpha (default = 10) :
   python vtkdelaunay3D.py -a 10 teapot_up.obj: gives some teapot with holes
   python vtkdelaunay3D.py -a 20 teapot_up.obj: gives some lovely ship
 """
-def delaunay3D(points ,file_out=None,render=True,sizeX=800,sizeY=800,alpha=10.0,tolerance=0.001,offset=2.5):
+def delaunay3D(points ,file_out=None,render=True,sizeX=800,sizeY=800,alpha=10.0,tolerance=0.001,offset=2.5,voxelspace=None):
     """
     Reads a file of vertices in VTK or OBJ format (ignoring any other info)
     Calls vtk Delaunay triangulation
@@ -92,9 +93,14 @@ def delaunay3D(points ,file_out=None,render=True,sizeX=800,sizeY=800,alpha=10.0,
                         nTriangles=int(liste[1])
                         assert len(coord)==3*nPoints
                         for i in range(nPoints):
+                            color = [0x77, 0x77, 0x77]
+                            if voxelspace:
+                                color = voxelspace.closestPointTo(voxel.Point(*coord[3*i:3*i+3])).toRGB()
                             objFile.write('v')
                             for j in range(3):
                                 objFile.write(' '+coord[3*i+j])
+                            for j in range(3):
+                                objFile.write(' '+color[j])
                             objFile.write('\n')	
                     else:
                         for c in liste:

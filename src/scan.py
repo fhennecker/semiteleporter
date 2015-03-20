@@ -79,7 +79,8 @@ class Scanner3D(Tkinter.Tk):
         return space
 
     def meshDelaunay3D(self, filename):
-        delaunay3D(self.toVoxelSpace().allPoints(), filename)
+        voxelspace = self.toVoxelSpace()
+        delaunay3D(voxelspace.allPoints(), filename, voxelspace=voxelspace)
         self.gui.popUpConfirm('Meshing', 'Meshing with delaunay3D finished')
 
     def meshBPA(self, filename):
