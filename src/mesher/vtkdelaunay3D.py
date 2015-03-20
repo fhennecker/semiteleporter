@@ -95,12 +95,13 @@ def delaunay3D(points ,file_out=None,render=True,sizeX=800,sizeY=800,alpha=10.0,
                         for i in range(nPoints):
                             color = [0x77, 0x77, 0x77]
                             if voxelspace:
-                                color = voxelspace.closestPointTo(voxel.Point(*coord[3*i:3*i+3])).toRGB()
+                                x, y, z = map(float, (coord[3*i], coord[3*i+1], coord[3*i+2]))
+                                color = voxelspace.closestPointTo(voxel.Point(x, y, z)).toRGB()
                             objFile.write('v')
                             for j in range(3):
                                 objFile.write(' '+coord[3*i+j])
                             for j in range(3):
-                                objFile.write(' '+color[j])
+                                objFile.write(' '+str(color[j]))
                             objFile.write('\n')	
                     else:
                         for c in liste:
