@@ -251,7 +251,7 @@ class VoxelSpace:
 		yield sorted(ifilter(eligible, points), key=distance)
 		
 		# didn't find any point in region, start looking in layers around region
-		for layer in range(1, distanceLimit):
+		for layer in xrange(1, distanceLimit):
 			points = self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer))
 			yield sorted(points, key=distance)
 
