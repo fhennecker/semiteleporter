@@ -5,6 +5,9 @@ def norm3D(vec):
 	#return np.linalg.norm(vec)
 	return sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
 
+def squareNorm3D(vec):
+	return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
+
 def flatten(list_of_lists):
 	"""[[a, b], [c, d]] -> [a, b, c, d]"""
 	for lst in list_of_lists:
@@ -199,29 +202,26 @@ class VoxelSpace:
 	def voxelsAroundRegion(self, cornerA, cornerB, layer=1):
 		ax, ay, az = np.minimum(cornerA, cornerB)
 		bx, by, bz = np.maximum(cornerA, cornerB)
-
-		voxels = []
-
+		voxelSpace = self.voxels
 		# fixed z
-		zgen = ((x, y, z) 	for x in range(ax-layer, bx+layer+1) \
-							for y in range(ay-layer, by+layer+1) \
-							for z in (az-layer, bz+layer+1) \
-							if (x, y, z) in self.voxels)
+		for x in xrange(ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in (az-layer, bz+layer+1) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 		# fixed x
-		xgen = ((x, y, z) 	for x in (ax-layer, bx+layer+1) \
-							for y in range(ay-layer, by+layer+1) \
-							for z in range(az, bz+layer) \
-							if (x, y, z) in self.voxels)
+		for x in (ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
 		# fixed y 
-		ygen = ((x, y, z) 	for x in range(ax, bx+layer) \
-							for y in (ay-layer, by+layer+1) \
-							for z in range(az, bz+layer) \
-							if (x, y, z) in self.voxels)
-
-		for gen in (zgen, xgen, ygen):
-			for item in gen:
-				yield item
+		for x in xrange(ax, bx+layer) :
+			for y in (ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
@@ -247,7 +247,7 @@ class VoxelSpace:
 		""" Finds the k closest points to edge a, b, with a voxel distance limit """
 		aVoxel = self.voxelIndexForPoint(a)
 		bVoxel = self.voxelIndexForPoint(b)
-		distance = lambda p : norm3D(a-p) + norm3D(b-p)
+		distance = lambda p : squareNorm3D(a-p) + squareNorm3D(b-p)
 		eligible = lambda p : p not in (a, b)
 		points = self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel))
 		yield sorted(filter(eligible, points), key=distance)
