@@ -203,23 +203,25 @@ class VoxelSpace:
 		voxels = []
 
 		# fixed z
-		voxels += [(x, y, z) 	for x in range(ax-layer, bx+layer+1) \
-								for y in range(ay-layer, by+layer+1) \
-								for z in (az-layer, bz+layer+1) \
-								if (x, y, z) in self.voxels]
+		zgen = ((x, y, z) 	for x in range(ax-layer, bx+layer+1) \
+							for y in range(ay-layer, by+layer+1) \
+							for z in (az-layer, bz+layer+1) \
+							if (x, y, z) in self.voxels)
 		# fixed x
-		voxels += [(x, y, z) 	for x in (ax-layer, bx+layer+1) \
-								for y in range(ay-layer, by+layer+1) \
-								for z in range(az, bz+layer) \
-								if (x, y, z) in self.voxels]
+		xgen = ((x, y, z) 	for x in (ax-layer, bx+layer+1) \
+							for y in range(ay-layer, by+layer+1) \
+							for z in range(az, bz+layer) \
+							if (x, y, z) in self.voxels)
 
 		# fixed y 
-		voxels += [(x, y, z) 	for x in range(ax, bx+layer) \
-								for y in (ay-layer, by+layer+1) \
-								for z in range(az, bz+layer) \
-								if (x, y, z) in self.voxels]
+		ygen = ((x, y, z) 	for x in range(ax, bx+layer) \
+							for y in (ay-layer, by+layer+1) \
+							for z in range(az, bz+layer) \
+							if (x, y, z) in self.voxels)
 
-		return voxels
+		for gen in (zgen, xgen, ygen):
+			for item in gen:
+				yield item
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
