@@ -1,4 +1,5 @@
 from math import floor, sqrt
+from itertools import ifilter
 import numpy as np
 
 def norm3D(vec):
@@ -194,7 +195,7 @@ class VoxelSpace:
 		voxels += list(self.range3D(xmin, xmax, vy+inner, vy+outer, zmin, zmax))
 
 		# Return only non-empty
-		return list(set(filter(self.voxels.get, voxels)))
+		return list(set(ifilter(self.voxels.get, voxels)))
 
 	def voxelsAroundRegion(self, cornerA, cornerB, layer=1):
 		ax, ay, az = np.minimum(cornerA, cornerB)
@@ -234,7 +235,7 @@ class VoxelSpace:
 		args = rangeBuilder(cornerA[0], cornerB[0]) + \
 		       rangeBuilder(cornerA[1], cornerB[1]) + \
 		       rangeBuilder(cornerA[2], cornerB[2])
-		return filter(self.voxels.get, self.range3D(*args))
+		return ifilter(self.voxels.get, self.range3D(*args))
 
 	def pointsInVoxels(self, voxels):
 		# get = lambda xyz: self.voxels.get(xyz, [])
@@ -250,7 +251,7 @@ class VoxelSpace:
 		distance = lambda p : norm3D(a-p) + norm3D(b-p)
 		eligible = lambda p : p not in (a, b)
 		points = self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel))
-		yield sorted(filter(eligible, points), key=distance)
+		yield sorted(ifilter(eligible, points), key=distance)
 		
 		# didn't find any point in region, start looking in layers around region
 		for layer in range(1, distanceLimit):
