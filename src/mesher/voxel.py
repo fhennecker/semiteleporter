@@ -196,28 +196,30 @@ class VoxelSpace:
 		# Return only non-empty
 		return list(set(filter(self.voxels.get, voxels)))
 
-	def voxelsAroundRegion(self, cornerA, cornerB, inner=1, outer=1):
-		if outer < inner:
-			outer = inner
+	def voxelsAroundRegion(self, cornerA, cornerB, layer=1):
+		ax, ay, az = np.minimum(cornerA, cornerB)
+		bx, by, bz = np.maximum(cornerA, cornerB)
 
-		def rangeBuilder(a, b, extension):
-			if a < b :
-				return (a-extension, b+extension+1)
-			else:
-				return (b-extension, a+extension+1)
+		voxels = []
 
-		# removing center
-		args = rangeBuilder(cornerA[0], cornerB[0], inner-1) + \
-		       rangeBuilder(cornerA[1], cornerB[1], inner-1) + \
-		       rangeBuilder(cornerA[2], cornerB[2], inner-1)
-		toRemove = set(self.range3D(*args))
+		# fixed z
+		voxels += [(x, y, z) 	for x in range(ax-layer, bx+layer+1) \
+								for y in range(ay-layer, by+layer+1) \
+								for z in (az-layer, bz+layer+1) \
+								if (x, y, z) in self.voxels]
+		# fixed x
+		voxels += [(x, y, z) 	for x in (ax-layer, bx+layer+1) \
+								for y in range(ay-layer, by+layer+1) \
+								for z in range(az, bz+layer) \
+								if (x, y, z) in self.voxels]
 
-		args = rangeBuilder(cornerA[0], cornerB[0], outer) + \
-		       rangeBuilder(cornerA[1], cornerB[1], outer) + \
-		       rangeBuilder(cornerA[2], cornerB[2], outer)
-		voxels = set(self.range3D(*args))
+		# fixed y 
+		voxels += [(x, y, z) 	for x in range(ax, bx+layer) \
+								for y in (ay-layer, by+layer+1) \
+								for z in range(az, bz+layer) \
+								if (x, y, z) in self.voxels]
 
-		return filter(self.voxels.get, voxels^toRemove)
+		return voxels
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
