@@ -200,29 +200,26 @@ class VoxelSpace:
 	def voxelsAroundRegion(self, cornerA, cornerB, layer=1):
 		ax, ay, az = np.minimum(cornerA, cornerB)
 		bx, by, bz = np.maximum(cornerA, cornerB)
-
-		voxels = []
-
+		voxelSpace = self.voxels
 		# fixed z
-		zgen = ((x, y, z) 	for x in range(ax-layer, bx+layer+1) \
-							for y in range(ay-layer, by+layer+1) \
-							for z in (az-layer, bz+layer+1) \
-							if (x, y, z) in self.voxels)
+		for x in xrange(ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in (az-layer, bz+layer+1) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 		# fixed x
-		xgen = ((x, y, z) 	for x in (ax-layer, bx+layer+1) \
-							for y in range(ay-layer, by+layer+1) \
-							for z in range(az, bz+layer) \
-							if (x, y, z) in self.voxels)
+		for x in (ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
 		# fixed y 
-		ygen = ((x, y, z) 	for x in range(ax, bx+layer) \
-							for y in (ay-layer, by+layer+1) \
-							for z in range(az, bz+layer) \
-							if (x, y, z) in self.voxels)
-
-		for gen in (zgen, xgen, ygen):
-			for item in gen:
-				yield item
+		for x in xrange(ax, bx+layer) :
+			for y in (ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
