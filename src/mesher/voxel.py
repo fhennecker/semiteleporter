@@ -5,9 +5,6 @@ def norm3D(vec):
 	#return np.linalg.norm(vec)
 	return sqrt(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])
 
-def squareNorm3D(vec):
-	return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
-
 def flatten(list_of_lists):
 	"""[[a, b], [c, d]] -> [a, b, c, d]"""
 	for lst in list_of_lists:
@@ -247,7 +244,7 @@ class VoxelSpace:
 		""" Finds the k closest points to edge a, b, with a voxel distance limit """
 		aVoxel = self.voxelIndexForPoint(a)
 		bVoxel = self.voxelIndexForPoint(b)
-		distance = lambda p : squareNorm3D(a-p) + squareNorm3D(b-p)
+		distance = lambda p : norm3D(a-p) + norm3D(b-p)
 		eligible = lambda p : p not in (a, b)
 		points = self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel))
 		yield sorted(filter(eligible, points), key=distance)
