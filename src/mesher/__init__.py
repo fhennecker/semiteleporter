@@ -7,6 +7,12 @@ import Queue
 import numpy as np
 from sys import stdout
 from itertools import ifilter, imap
+from subprocess import check_output
+
+try:
+    CURRENT_VERSION = check_output(["git", "show"]).split()[1]
+except:
+    CURRENT_VERSION = "UNKNOWN"
 
 class ObjParser:
     def __init__(self, filename):
@@ -57,6 +63,7 @@ class Mesher:
 
     def writeToObj(self, filename):
         with open(filename, 'w') as obj:
+            print >>obj, "### Semiteleporter version:", CURRENT_VERSION, "###"
             for point in self.points.getSortedPoints():
                 print >>obj, point.toObjFormat()
             for face in self.faces:
