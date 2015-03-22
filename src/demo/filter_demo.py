@@ -1,4 +1,4 @@
-import cv2
+import sys, cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -10,9 +10,9 @@ def dia(img):
         plt.xlim([0,256])
     plt.show()
 
-def color():
-    img_off = cv2.imread('./lampe/65_off.png')
-    img_on = cv2.imread('./lampe/65_right.png')
+def color(img_on, img_off):
+    img_off = cv2.imread(img_off)
+    img_on = cv2.imread(img_on)
 
     img = np.array((np.array(img_on, dtype=np.int16)-np.array(img_off, dtype=np.int16)).clip(0,255), dtype=np.uint8)
     img = cv2.medianBlur(img,3)
@@ -66,5 +66,5 @@ def color():
 
 if("__main__" == __name__):
 
-    color()
+    color(sys.argv[1], sys.argv[2])
 
