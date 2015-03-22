@@ -6,6 +6,7 @@ from math import sqrt
 import Queue
 import numpy as np
 from sys import stdout
+from itertools import ifilter, imap
 
 class ObjParser:
     def __init__(self, filename):
@@ -92,12 +93,12 @@ class Mesher:
 
     def longestEdgeLength(self, point):
         """ Returns the length of the longest edge adjacent to a point """
-        res = max(map(point.distance, self.existingEdges[point]))
+        res = max(imap(point.distance, self.existingEdges[point]))
         return res
 
     def shortestEdgeLength(self, point):
         """ Returns the length of the shortest edge adjacent to a point """
-        res = min(map(point.distance, self.existingEdges[point]))
+        res = min(imap(point.distance, self.existingEdges[point]))
         return res
 
     def samplingUniformityDegree(self, point):
@@ -246,14 +247,14 @@ class Mesher:
         edges = [[norm3D(f[i] - f[i-1]) for i in range(3)] for f in faces]
 
         # Edge length mean
-        mu = sum(map(sum, edges)) / (3*len(edges))
+        mu = sum(imap(sum, edges)) / (3*len(edges))
         # Edge length std deviation
-        sigma = sqrt(sum(map(lambda e: sum((x-mu)**2 for x in e), edges)) / (3*len(edges)))
+        sigma = sqrt(sum(imap(lambda e: sum((x-mu)**2 for x in e), edges)) / (3*len(edges)))
 
         edgeOK = lambda e: abs(e-mu) < (z*sigma)
         faceOK = lambda f: edgeOK(f[0]) and edgeOK(f[1]) and edgeOK(f[2])
-        faceOKIndexes = filter(lambda i: faceOK(edges[i]), xrange(len(faces)))
-        self.faces = set(map(faces.__getitem__, faceOKIndexes))
+        faceOKIndexes = ifilter(lambda i: faceOK(edges[i]), xrange(len(faces)))
+        self.faces = set(imap(faces.__getitem__, faceOKIndexes))
         self.info("Keep edges in %d..%dmm" % (max(0, mu - z*sigma), mu + z*sigma))
         print
 

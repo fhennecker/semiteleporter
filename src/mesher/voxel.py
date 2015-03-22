@@ -1,4 +1,5 @@
 from math import floor, sqrt
+from itertools import ifilter
 import numpy as np
 
 def norm3D(vec):
@@ -194,30 +195,31 @@ class VoxelSpace:
 		voxels += list(self.range3D(xmin, xmax, vy+inner, vy+outer, zmin, zmax))
 
 		# Return only non-empty
-		return list(set(filter(self.voxels.get, voxels)))
+		return list(set(ifilter(self.voxels.get, voxels)))
 
-	def voxelsAroundRegion(self, cornerA, cornerB, inner=1, outer=1):
-		if outer < inner:
-			outer = inner
+	def voxelsAroundRegion(self, cornerA, cornerB, layer=1):
+		ax, ay, az = np.minimum(cornerA, cornerB)
+		bx, by, bz = np.maximum(cornerA, cornerB)
+		voxelSpace = self.voxels
+		# fixed z
+		for x in xrange(ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in (az-layer, bz+layer+1) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
+		# fixed x
+		for x in (ax-layer, bx+layer+1) :
+			for y in xrange(ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
-		def rangeBuilder(a, b, extension):
-			if a < b :
-				return (a-extension, b+extension+1)
-			else:
-				return (b-extension, a+extension+1)
-
-		# removing center
-		args = rangeBuilder(cornerA[0], cornerB[0], inner-1) + \
-		       rangeBuilder(cornerA[1], cornerB[1], inner-1) + \
-		       rangeBuilder(cornerA[2], cornerB[2], inner-1)
-		toRemove = set(self.range3D(*args))
-
-		args = rangeBuilder(cornerA[0], cornerB[0], outer) + \
-		       rangeBuilder(cornerA[1], cornerB[1], outer) + \
-		       rangeBuilder(cornerA[2], cornerB[2], outer)
-		voxels = set(self.range3D(*args))
-
-		return filter(self.voxels.get, voxels^toRemove)
+		# fixed y 
+		for x in xrange(ax, bx+layer) :
+			for y in (ay-layer, by+layer+1) :
+				for z in xrange(az, bz+layer) :
+					if (x, y, z) in voxelSpace:
+						yield (x, y, z)
 
 	def voxelsInRegion(self, cornerA, cornerB):
 		""" Returns all voxels within the parallelepipedic 
@@ -230,7 +232,7 @@ class VoxelSpace:
 		args = rangeBuilder(cornerA[0], cornerB[0]) + \
 		       rangeBuilder(cornerA[1], cornerB[1]) + \
 		       rangeBuilder(cornerA[2], cornerB[2])
-		return filter(self.voxels.get, self.range3D(*args))
+		return ifilter(self.voxels.get, self.range3D(*args))
 
 	def pointsInVoxels(self, voxels):
 		# get = lambda xyz: self.voxels.get(xyz, [])
@@ -246,10 +248,10 @@ class VoxelSpace:
 		distance = lambda p : norm3D(a-p) + norm3D(b-p)
 		eligible = lambda p : p not in (a, b)
 		points = self.pointsInVoxels(self.voxelsInRegion(aVoxel, bVoxel))
-		yield sorted(filter(eligible, points), key=distance)
+		yield sorted(ifilter(eligible, points), key=distance)
 		
 		# didn't find any point in region, start looking in layers around region
-		for layer in range(1, distanceLimit):
+		for layer in xrange(1, distanceLimit):
 			points = self.pointsInVoxels(self.voxelsAroundRegion(aVoxel, bVoxel, layer))
 			yield sorted(points, key=distance)
 
