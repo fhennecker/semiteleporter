@@ -340,8 +340,8 @@ L'algorithme est appliqué sur chaque tranche correspondant aux points illuminé
 \end{enumerate}
 
 \subsection{Représentation en 3D}
-A ce stade, nous disposons d'un nuage de points en 3D. Plusieurs étapes sont nécessaires pour transformer cet ensemble de points en un solide.(\cite{shapiro}-chap.13)\\
-Deux représentations sont possibles : un réseau de mailles (meshes) reliant ces points ou un ensemble de petits cubes (voxels), à la manière d'une image bitmap. Il est possible de passer d'une représentation à l'autre.\\
+A ce stade, nous disposons d'un nuage de points en 3D. Cependant, les applications 3D utilisent usuellement des volumes, notamment pour déterminer ou passerait la lumière, par où de l'eau s'écoulerait, ... Plusieurs étapes sont nécessaires pour transformer cet ensemble de points en un solide.(\cite{shapiro}-chap.13)\\
+Deux représentations sont possibles : un réseau de mailles (meshes) reliant ces points ou un ensemble de petits cubes (voxels), à la manière d'une image bitmap. Il est possible de passer d'une représentation à l'autre par rastérisation.\\
 Pour constituer ces représentations, une étape importante sera d'éliminer tant que faire se peut les points "parasites" ("bruit").
 \subsubsection{Voxelisation}
 Un voxel est un pixel en 3D : sa valeur binaire indique si le cube dans l'espace qu'il représente appartient ou non à l'objet.(\cite{Voxelization,basdogan,pulli})\\
@@ -370,6 +370,8 @@ Une allégorie pour mieux comprendre ce paramètre est celle du bloc de crème g
 nous creusons et retirons petit-à-petit la glace, en évitant les pépites; l'ensemble des pépites représente notre nuage de points et le rayon de notre cuillère correspond à \(\alpha\).
 Plus le rayon est petit, plus de glace nous pourrons retirer sans toucher à des pépites pourtant très proches. Au contraire, si le rayon est trop grand, le bloc de glace restera intacte.
 Ainsi, le paramètre \(\alpha\) détermine la distance à laquelle les points doivent se trouver les uns par rapport aux autres pour être reliés par l'algorithme (figures \ref{Delaunay-avant} et \ref{Delaunay-apres}).
+
+Nous avons intégré l'algorithme de triangulation de la bibliothèque Vizualisation ToolKit (vtk \cite{vtk}), accessible dans l'interface graphique depuis le bouton \textit{Mesh with Delaunay3D}
 \begin{figure}[h!]
 \begin{minipage}{.5\textwidth}
 	\centering
@@ -444,10 +446,10 @@ Notons que pour des détails d'implémentation, les couleurs ne sont pas conserv
 
 \section{Réglages par défaut du programme}
 \subsection{Paramètres}
-Sauf mention contraire, les paramètres sont identiques à ceux-ci dans les comparaisons de ce chapitre.
+Sauf mention contraire, les paramètres des comparaison de ce chapitre sont identiques à ceux fixés ci-dessous.
 
 \begin{itemize}
-	\item Seuil pour le filtrage des points par Douglas-Peucker: 2mm
+	 \item Seuil pour le filtrage des points par Douglas-Peucker: 2mm
     \item VoxelSpace découpé en cubes de 10mm de côté
     \item z-valeur pour le filtre après l'IPD: 2.58 (99\% d'une distribution normale $\Rightarrow$ longueur maximale de 58mm.
     \item Rayon de balle pour le BPA Meshlab: 24mm
@@ -477,14 +479,16 @@ Sauf mention contraire, les paramètres sont identiques à ceux-ci dans les comp
 	    \includegraphics[width=\textwidth]{results/defaults-delaunay.png}
         \caption{Delaunay 3D\\5973 faces - 1s}
     \end{subfigure}
-    \caption{Comparaison du maillage avec les différents algorithmes}
+    \caption{\label{fig:meshcmp}Comparaison du maillage avec les différents algorithmes}
 \end{figure}
 
 \subsection{Observations}
+Les résultats sont présentés à la Figure \ref{fig:meshcmp}
 \begin{itemize}
 	\item Le nuage de points est peu dense, certaines zones ne sont pas bien couvertes et il semblerait que certaines couleurs soient plus propices a être manquantes que d'autres (tons verts et bleus).
-    \item L'algorithme IPD donne de bons résultats, mais il y a beaucoup de triangles, certains se chevauchent.
+    \item L'algorithme IPD donne de bons résultats, mais il y a beaucoup de triangles, certains se chevauchent. Le temps d'exécution est très supérieur aux autres (voir Figure \ref{fig:meshgraph})
     \item Le BPA donne une surface plus complète que Delaunay 3D, mais avec près de 3 fois moins de faces.
+    \item L'implémentation Meshlab laisse de beaucoup moins grands trous que l'implémentation de Julie Digne, bien que cette dernière utilise un rayon de balle progressif.
     \item Delaunay laisse une surface très trouée.
 \end{itemize}
 
@@ -498,19 +502,11 @@ Sauf mention contraire, les paramètres sont identiques à ceux-ci dans les comp
 	    \includegraphics[width=\textwidth]{results/algos-time-cmp.png}
         \caption{Temps d'exécution du maillage}
     \end{subfigure}
-    \caption{Comparaison du maillage avec les différents algorithmes - graphes}
+    \caption{\label{fig:meshgraph} Comparaison du maillage avec les différents algorithmes - graphes}
 \end{figure}
 
 \section{Sans douglas-peucker}
-\subsection{Paramètres}
-\begin{itemize}
-	\item Le filtrage par douglas-peucker n'est pas utilisé
-    \item VoxelSpace découpé en cubes de 3mm de côté (car beaucoup plus de points, voir ci-dessous)
-    \item z-valeur pour le filtre après l'IPD: 2.58 (99\% d'une distribution normale $\Rightarrow$ longueur maximale de 58mm.
-    \item Rayon de balle pour le BPA Meshlab: 10mm
-    \item Rayons de balles successifs pour le BPA: 10, 20, 50 et 80mm
-    \item Paramètre alpha de Delaunay 3D: 10.0
-\end{itemize}
+Dans cette variante, on n'utilise pas la simplification de points de Douglas-Peucker (seuil de 0mm). On réduit en outre la taille d'échantillonage du VoxelSpace (structure de données pour la recherche de points dans l'algorithme IPD) à 3mm, pour faire face à l'important nombre de points.
 
 \begin{figure}[h!]
 	\centering
@@ -538,10 +534,11 @@ Sauf mention contraire, les paramètres sont identiques à ceux-ci dans les comp
 	    \includegraphics[width=\textwidth]{results/algos-nodp-time-cmp.png}
         \caption{Temps d'exécution du maillage}
     \end{subfigure}
-    \caption{Comparaison du maillage pour les différents algorithmes, sans filtrage préalable des points}
+    \caption{\label{fig:meshcmp2}Comparaison du maillage pour les différents algorithmes, sans filtrage préalable des points}
 \end{figure}
 
 \subsection{Observations}
+Les résultats sont présentés à la Figure \ref{fig:meshcmp2}
 \begin{itemize}
 	\item Le nuage de point est dense, on peut distinguer les différentes tranches, et toute la surface est bien couverte.
     \item Les régions trouées à la section précédente sont visibles ici, les points y sont bien alignés. C'est donc que l'algorithme de Douglas Peucker a retiré beaucoup de points dans ces zones. Le laser produit donc des résultats différents selon les couleurs qu'il touche.
@@ -552,7 +549,7 @@ Sauf mention contraire, les paramètres sont identiques à ceux-ci dans les comp
 
 \section{Comparaison de différents seuils pour l'algorithme de Douglas Peucker}
 
-Dans cette section, nous comparons le nombre de points obtenus après la triangulation, en fonction de la distance minimum à la ligne pour qu'un point soit significatif.
+Dans cette section, nous comparons le nombre de points obtenus après l'étape de filtrage des point suivant la triangulation, en fonction de la distance minimum à la ligne pour qu'un point soit significatif.
 
 \begin{figure}[h!]
 	\centering
@@ -580,11 +577,18 @@ Dans cette section, nous comparons le nombre de points obtenus après la triangu
 	    \includegraphics[width=\textwidth]{results/dp-points-graph.png}
         \caption{Nombre de points en fonction du seuil Douglas-Peucker}
     \end{subfigure}
-    \caption{Comparaison de différents seuil pour l'étape de filtrage des points par Douglas-Peucker}
+    \caption{\label{fig:dpcmp}Comparaison de différents seuil pour l'étape de filtrage des points par Douglas-Peucker}
 \end{figure}
 
+\subsection{Observations}
+Les résultats sont présentés à la Figure \ref{fig:dpcmp}
+\begin{itemize}
+  \item L'algorithme atteint le but fixé, puisque même en retirant beacuoup de points, les significatifs sont gardés
+  \item En revanche, la distribution des points supprimés est inégale, probablement car la perception des couleurs par la caméra affecte la précision de la triangulation.
+\end{itemize}
+
 \section{Comparaison de différentes tailles de VoxelSpace pour IPD}
-Dans cette section, on s'intéresse au temps et au nombre de faces trouvées par notre implémentation Python de l'Intrinsic Property Driver algorithm.
+Dans cette section, on s'intéresse au temps et au nombre de faces trouvées par notre implémentation Python de l'Intrinsic Property Driver algorithm, lorsqu'on fait varier la taille d'échantillonage du VoxelSpace.
 
 \begin{figure}[h!]
 	\centering
@@ -608,8 +612,11 @@ Dans cette section, on s'intéresse au temps et au nombre de faces trouvées par
 	    \includegraphics[width=\textwidth]{results/vs-time-cmp.png}
         \caption{Temps de maillage en fonction de la taille du VS}
     \end{subfigure}
-    \caption{Comparaison des performances et résultats de l'IPD avec différentes tailles de \textit{VoxelSpace}}
+    \caption{\label{fig:vscmp} Comparaison des performances et résultats de l'IPD avec différentes tailles de \textit{VoxelSpace}}
 \end{figure}
+
+\subsection{Observations}
+Les résultats sont présentés à la Figure \ref{fig:vscmp}. De manière générale, la résolution semble trop faible pour obtenir une forme acceptable.
 
 \chapter{Conclusions et perspectives}
 
@@ -832,6 +839,7 @@ void loop() {
 \bibitem{libgp2} \url{http://magiclantern.wikia.com/wiki/Remote_control_with_PTP_and_Python}
 \bibitem{cremote} \url{https://pythonhosted.org/canon-remote/}
 \bibitem{meshlab} \url{http://meshlab.sourceforge.net/}
+\bibitem{vtk} The visualization toolkit \url{http://www.vtk.org/}
 \bibitem{Delaunay} \url{http://www.ai.univ-paris8.fr/~audibert/ens/11-Triangulation.pdf}
 \bibitem{2algo} Lee D.T. et Schachter B.J. 1980 "Two Algorithms for Constructing a Delaunay Triangulation" International Journal of Computer and Information Sciences vol.9 n.3 Plenum Publishing Corporation
 \bibitem{edelsbrunner} Edelsbrunner Herbert, Kirkpatrick D.G. et Seidel R. 1983 "On the Shape of a Set of Points in the Plane" IEEE Transactions on Information Theory vol. IT-29 n.4 juillet 1983.
