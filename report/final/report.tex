@@ -483,7 +483,7 @@ Sauf mention contraire, les paramètres des comparaison de ce chapitre sont iden
 \end{figure}
 
 \subsection{Observations}
-Les résultats sont présentés à la Figure \ref{fig:meshcmp}
+Les résultats sont présentés à la Figure \ref{fig:meshcmp}. De manière générale, la résolution semble trop faible pour obtenir une forme acceptable.
 \begin{itemize}
 	\item Le nuage de points est peu dense, certaines zones ne sont pas bien couvertes et il semblerait que certaines couleurs soient plus propices a être manquantes que d'autres (tons verts et bleus).
     \item L'algorithme IPD donne de bons résultats, mais il y a beaucoup de triangles, certains se chevauchent. Le temps d'exécution est très supérieur aux autres (voir Figure \ref{fig:meshgraph})
@@ -616,7 +616,11 @@ Dans cette section, on s'intéresse au temps et au nombre de faces trouvées par
 \end{figure}
 
 \subsection{Observations}
-Les résultats sont présentés à la Figure \ref{fig:vscmp}. De manière générale, la résolution semble trop faible pour obtenir une forme acceptable.
+Les résultats sont présentés à la Figure \ref{fig:vscmp}.
+
+Sur de larges ensembles de points denses, on remarque une relation quasiment linéaire entre la taille d'échantillonage et le temps d'exécution. Ce comportement illustre la difficulté de l'opération la plus souvent utilisée dans les algorithmes de maillage: la recherche du point le plus proche dans l'espace, qui dépend du nombre de points à examiner.
+
+Nous remarquons aussi que la taille d'échantillonage influe sur les triangles de la surface finale. Ce comportement illustre la difficulté d'effectuer une rastérisation efficace des cubes du VoxelSpace pour trouver les points appartenant à une zone d'influence, qui est, rappelons le, un triangle extrudé qui peut être tourné dans n'importe quelle direction dans l'espace.
 
 \chapter{Conclusions et perspectives}
 
@@ -628,10 +632,12 @@ Bien entendu, les résultats ne sont pas encore "professionnels"; un grand nombr
 \item Au niveau de l'extraction des tracés lasers, l'ensemble des filtres pourrait être géré de manière dynamique en fonction du milieu dans lequel le scanner se trouve : il faudrait réaliser une première phase de "calibration d'environnement" afin de déterminer l'intensité lumineuse du milieu pour ensuite estimer au mieux les différents paramètres de filtrage. Malheureusement, ce genre d'opération devrait idéalement se produire pour chaque lot d'images, ce qui risquerait de fortement augmenter le temps du traitement des images. Mais nous pensons que ce genre de traitement pourrait nettement augmenter la qualité des résultats, car il s'agit là d'un problème auquel nous avons souvent été confrontés.
 \item Au niveau de la triangulation, nous pourrions effectuer une étude approfondie de la stabilité, du conditionnement et de l'erreur introduite, et les calculs pourraient être remaniés pour réduire au maximum les erreurs.
 \item Un post-traitement des points pourrait également être effectué afin de ne conserver que les meilleurs points dès le début et ainsi limiter le temps total de traitement.
-\item Au niveau du meshing, on constate que la méthode implémentée est encore relativement lente. Nous pourrions
+\item Au niveau du meshing, on constate que la méthode implémentée est encore relativement lente. Un profiling nous a déjà permis de trouver les portions de code les plus coûteuses en temps, et nous avons pu réduire l'impact de certaines. L'impact de la taille des voxels sur le temps de calcul est crucial, et nous pourrions tenter de déterminer la taille optimale dynamiquement.
 \end{itemize}
 
-Pour conclure, les résultats de ce premier prototype sont positifs et encouragent à implémenter de nouvelles améliorations afin de rendre les résultats exploitables pour d'autres applications. Nous souhaiterions rendre les objets scannés imprimables par une imprimante 3D, 
+Nous souhaiterions rendre les objets scannés imprimables par une imprimante 3D, ce qui requiert des objets peu complexes pour le générateur de gcode qui doit trouver le meilleur chemin pour la tête d'impression, et dont l'impression par dépôt de couches successives est possible. L'objet à imprimer ne doit donc pas contenir trop de trous. Enfin, il faut prendre en compte l'épaisseur de l'objet, ce qui n'est actuellement pas possible pour les volumes concaves (la tasse par exemple).
+
+Pour conclure, les résultats de ce premier prototype sont positifs et encouragent à implémenter de nouvelles améliorations afin de rendre les résultats exploitables pour d'autres applications.
 
 \newpage
 \appendix
@@ -645,17 +651,19 @@ R_F = \frac{V_A-V\textsubscript{OL}-V_F}{I_F} = \frac{5-0,9-2,45}{0,015} \enspac
 \end{equation}
 
 \begin{figure}[h!]
-\centering
-\includegraphics[width=0.8\textwidth]{Caracteristique.jpg}
-\caption{Caractéristique mesurée des diodes lasers}
-\label{laser_caracteristique}
+  \centering
+  \begin{subfigure}[b]{0.6\textwidth}
+    \includegraphics[width=\textwidth]{Caracteristique.jpg}
+    \caption{Caractéristique mesurée des diodes lasers}
+    \label{laser_caracteristique}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.3\textwidth}
+    \includegraphics[width=\textwidth]{circuit2lasers.jpg}
+    \caption{Schéma d'alimentation des diodes laser}
+    \label{laser_circuit}
+  \end{subfigure}
 \end{figure}
-\begin{figure}[h!]
-\centering
-\includegraphics[width=0.4\textwidth]{circuit2lasers.jpg}
-\caption{Schéma d'alimentation des diodes laser}
-\label{laser_circuit}
-\end{figure}
+
 \newpage
 \chapter{Le logiciel pour l'arduino}\label{code-arduino}
 \begin{lstlisting}
@@ -793,6 +801,7 @@ void loop() {
 }
 \end{lstlisting}
 
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 
 \newpage
