@@ -163,7 +163,7 @@ Le télémètre laser mesure le temps que met une impulsion de lumière pour par
 
 \section{Une caméra et deux lasers.}
 Cette technique fonctionne grâce à 2 lasers, une caméra ainsi qu’une plateforme tournante. Les lentilles des lasers focalisent le rayon en un rideau vertical, ce qui laisse apparaître une ligne sur l’objet. La caméra prend une photo de l’objet lorsque les lasers sont allumés, ainsi que lorsqu’ils sont éteints. On procède ensuite à une soustraction des deux images précédemment obtenues afin de ne conserver que les traces lumineuses
-produites par les lasers (voir figure \ref{laser_scanner}). Connaissant l’orientation des lasers, la distance qui les sépare ainsi que la distance au centre de la plateforme, il nous est possible de calculer la position exacte de chacun des points illuminés par les lasers. L’opération est répétée un certain nombre de fois, selon la qualité de l’image numérique souhaitée. L'utilisation de deux lasers permet notamment de corriger les effets de l'ambiance lumineuse mais aussi\cite{dsls} de distinguer les zones de l'objet qui pourraient être invisibles pour une seule caméra car cachées par des parties saillantes de l'objet : la caméra voit les lignes de contour formées par les deux lasers sous des angles différents; cette solution est moins coûteuse que disposer deux caméras de part et d'autre d'un laser (voir figure \ref{proj_structuree}).
+produites par les lasers (voir figure \ref{laser_scanner}). Connaissant l’orientation des lasers, la distance qui les sépare ainsi que la distance au centre de la plateforme, il nous est possible de calculer la position exacte de chacun des points illuminés par les lasers. L’opération est répétée un certain nombre de fois, selon la qualité de l’image numérique souhaitée. L'utilisation de deux lasers permet notamment de corriger les effets de l'ambiance lumineuse, mais aussi d'obtenir deux tranches de l'objet par position, réduisant ainsi le nombre de rotations\footnote{C'est la rotation du plateau qui est la plus coûteuse en temps dans l'acquisition de points 3D.} à effectuer pour une résolution équivalente; et permet \cite{dsls} de distinguer les zones de l'objet qui pourraient être invisibles pour une seule caméra car cachées par des parties saillantes de l'objet : la caméra voit les lignes de contour formées par les deux lasers sous des angles différents; cette solution est moins coûteuse que disposer deux caméras de part et d'autre d'un laser (voir figure \ref{proj_structuree}).
 
 \begin{figure}[h!]
 \centering
@@ -224,7 +224,7 @@ Peu coûteux car fabriqués en grandes quantités, ces petits moteurs consomment
 \end{figure}
 \subsection{Les contrôleurs des moteurs pas-à-pas}
 Les contrôleurs des moteurs unipolaires sont très simples : il suffit d'un circuit rassemblant plusieurs transistors darlingtons (un ULN2003 par exemple).\\
-Sans entrer ici dans les détails, signalons que les contrôleurs de bipolaires sont plus complexes(\cite{stepctrl}). Nous utilisons un circuit réalisé autour du chip A3967 d'Allegro Microsystems.
+Sans entrer ici dans les détails, signalons que les contrôleurs de bipolaires sont plus complexes(\cite{stepctrl}). Nous utilisons le circuit Easydriver réalisé autour du chip A3967 d'Allegro Microsystems.
 \subsection{Construction}
 \begin{comment}
 Un premier prototype a été réalisé avec un moteur 28BYJ-48 sur un assemblage d'élements métaliques de récupération formant une plateforme très stable. Les 4096 pas avec 4096 allumages et extinctions des diodes et 2x4096 enregistrements d'images par la webcam du PC\footnote{i7-3632QM 2,2 GHz sous Linux Mint 17 64 bits} (mais sans traitement de celles-ci) sont effectués en 11 minutes.\\
@@ -236,10 +236,7 @@ Un premier prototype a été réalisé avec un moteur 28BYJ-48 sur un assemblage
 \label{proto1}
 \end{figure}
 \end{comment}
-Le prototype utilisz une webcam Logitech Carl Zeiss Tessar HD 1080p (figure \ref{proto}). À chaque pas, la webcam capture 3 photos: une avec le laser gauche allumé, la seconde avec les deux lasers éteints et la dernière avec le laser droit allumé.
-\begin{comment}
-Une reconstruction de l'objet dans son entièreté est ensuite élaborée. La création de ce prototype nous permet d'appliquer certaines techniques de calibrage (principalement physiques) et de nous pencher plus concrètement sur les problèmes de calculs de distances. Un algorithme de triangulation a été développé et testé sur ce tirage.
-\end{comment}
+Le prototype utilise une webcam Logitech Carl Zeiss Tessar HD 1080p (figure \ref{proto}). À chaque pas, la webcam capture 3 photos: une avec le laser gauche allumé, la seconde avec les deux lasers éteints et la dernière avec le laser droit allumé. Une reconstruction de l'objet dans son entièreté est ensuite élaborée. La création de ce prototype nous permet d'appliquer certaines techniques de calibrage (principalement physiques) et de nous pencher plus concrètement sur les problèmes de calculs de distances. Un algorithme de triangulation a été développé et testé sur ce tirage.
 
 \begin{figure}[h!]
 \centering
@@ -249,7 +246,7 @@ Une reconstruction de l'objet dans son entièreté est ensuite élaborée. La cr
 \end{figure}
 
 \section{Le software sur l'arduino}
-Le rôle de l'arduino est réduit à la commande du moteur pas-à-pas via son contrôleur et l'allumage des lasers. Sa programmation se limite donc à la réalisation d'un interprêteur de commandes reçues du PC. Son code, qui n'est évidemment pas présent sur la machine virtuelle tournant sur le PC, est repris en annexe \ref{code-arduino}.
+Le rôle de l'arduino est réduit à la commande du moteur pas-à-pas via son contrôleur et l'allumage des lasers. Son programme se limite donc à la réalisation d'un interprêteur de commandes reçues du PC par une liaison série. Son code, qui n'est évidemment pas présent sur la machine virtuelle tournant sur le PC, est repris en annexe \ref{code-arduino}.
 
 \section{Le software sur le PC}
 Les fonctions principales du logiciel Python sur le PC sont :
@@ -269,7 +266,7 @@ Le calibrage peut être constructif ou software ou une combinaison des deux.
 Il faut positionner de façon précise les lasers qui émettent un "rayon plan", la caméra et le plateau portant l'objet à scanner et mis en rotation par le moteur pas-à-pas.
 \begin{enumerate}
 \item Régler les lasers de telle sorte que l'intersection de leurs plans de projection coïncide avec l'axe de rotation du plateau.\\
-Pour faciliter ce réglage, on commence par s'assurer (avec un niveau d'eau) que le plateau est parfaitement horizontal; on matérialise ensuite l'axe de rotation à l'aide d'un fil à plomb; il suffit alors de régler les diodes pour que leurs "rayons laser" illuminent le fil à plomb sur toute sa hauteur, en commençant par vérifier que leur intersection sur le plateau coïncide avec le centre de rotation de celui-ci. Il faut ensuite de mesurer les angles d'orientation des lasers.
+Pour faciliter ce réglage, on commence par s'assurer (avec un niveau d'eau) que le plateau est parfaitement horizontal; on matérialise ensuite l'axe de rotation à l'aide d'un fil à plomb; il suffit alors de régler les diodes pour que leurs "rayons laser" illuminent le fil à plomb sur toute sa hauteur, en commençant par vérifier que leur intersection sur le plateau coïncide avec le centre de rotation de celui-ci. Il faut ensuite mesurer les angles d'orientation des lasers.
 \item Positionner la caméra de telle façon que le centre du capteur soit sur la bissectrice de l'angle formé par les deux diodes laser et le centre de rotation comme sommet, et que le capteur soit perpendiculaire à cette bissectrice.
 \item Il ne reste plus qu'à mesurer la position de la caméra, du centre du plateau et des lasers (par rapport au pied de la camera sur le sol), ainsi que les angles d'orientation des lasers et de la camera.
 \end{enumerate}
@@ -277,31 +274,31 @@ Pour faciliter ce réglage, on commence par s'assurer (avec un niveau d'eau) que
 Pour palier la grande difficulté de réaliser correctement tous les réglages et mesures du calibrage constructif, un calibrage software est nécessaire. Celui-ci consiste à:
 \begin{enumerate}
 \item Positionner les lasers de telle façon qu'ils passent par le centre du plateau et mesurer la position tridimensionnelle du centre du plateau, de la caméra et des lasers.
-\item Capturer un triplet d'images du plateau vide: celle de gauche où figure la ligne tracée par le laser de gauche, l'image dit "de fond" où aucun laser n'est allumé, et enfin celle de droite où figure la ligne tracée par le laser de droite. Il suffit alors d'extraire les tracés laser et de déterminer leur intersection qui correspond au centre du plateau dans le monde 2D. Grâce à ces tracés lasers sur le plateau, on devient capable de déterminer le centre du plateau sur les images (leur intersection), ce qui nous permet alors de faire une correspondance avec la position 3D du centre de la table déterminée à l'étape précédente.
+\item Capturer un triplet d'images du plateau vide: celle de gauche où figure la ligne tracée par le laser de gauche, l'image dit "de fond" où aucun laser n'est allumé, et enfin celle de droite où figure la ligne tracée par le laser de droite. Il suffit alors d'extraire les tracés laser et de déterminer leur intersection qui correspond au centre du plateau dans le monde 2D. Grâce à ces tracés lasers sur le plateau, on devient capable de déterminer le centre du plateau sur les images (leur intersection), ce qui nous permet alors de faire une correspondance avec la position 3D du centre de la table déterminée à l'étape précédente. (voir Figure \ref{fig:softcalib})
 \item Connaissant la position réelle du centre du plateau, nous pouvons réaliser une correspondance entre le point 2D déterminé précédement et le point 3D mesuré lors de la première étape. Nous devenons alors capable de déterminer l'orientation de la camera par rapport aux plans horizontal et vertical. En effet, nous possédons une correspondance entre le monde 2D et 3D pour le centre du plateau et nous connaissons la position réelle de la caméra; nous pouvons donc tracer le vecteur bisecteur partant du capteur de la camera en joignant le centre du plateau (comme si la camera était centrée sur le centre du plateau). Il suffit ensuite de pivoter ce vecteur de façon à ce qu'il corrige l'offset vertical et horizontal du centre du plateau 2D par rapport au centre de l'image. Nous obtenons alors l'orientation réelle de la camera.
 
 \begin{figure}[h!]
-\begin{minipage}{.5\textwidth}
-	\centering
-	\includegraphics[width=0.7\textwidth]{calibration_jpg.jpg}
-	\caption{Calibration}
-\end{minipage}%
-\begin{minipage}{.5\textwidth}
-	\centering
-	\includegraphics[width=0.9\textwidth]{plateau_jpg.jpg}
-	\caption{Schéma}
-\end{minipage}
+  \centering
+  \begin{subfigure}[b]{0.59\textwidth}
+    \includegraphics[width=\textwidth]{calibration_jpg.jpg}
+    \caption{Calibration du centre du plateau}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.39\textwidth}
+  	\includegraphics[width=0.9\textwidth]{plateau_jpg.jpg}
+  	\caption{Schéma}
+  \end{subfigure}
+  \caption{\label{fig:softcalib} Calibration software du système}
 \end{figure}
 
 \item Il ne reste plus qu'à déterminer l'orientation des lasers. Pour cela, nous faisons l'hypothèse que les lasers sont alignés avec la caméra. Connaissant la position du centre du plateau, de la caméra, des lasers et l'orientation de la caméra, il devient aisé de modéliser les plans verticaux que tracent les lasers. En effet, nous connaissons le vecteur vertical ainsi que le vecteur horizontal partant de la position du laser et joignant le centre du plateau. Nous sommes donc capables de déterminer les angles que font ces plans avec le plan vertical du repère. Il s'agit des angles respectifs des lasers.
 \end{enumerate}
 
 \subsection{Acquisition et extraction des tracés laser}
-La caméra prend une photo de l’objet pour chaque laser allumé individuellement, ainsi qu'une photo lorsqu’ils sont éteints. La soustraction d'une image laser allumé et lasers éteints permet d'extraire grossièrement le tracé laser en question. Il faut donc ensuite appliquer tout une série de filtres afin de "purifier" ce tracé. Pour ce faire, nous appliquons des filtres de couleurs RGB, de saturations HSV ainsi que des filtres basiques de threshold, de flou Gaussien et médian. Finalement, nous réduisons le tracé à un unique pixel en largeur grâce à une moyenne pondérée en fonction de l'intensité du pixel par rapport à sa position.
+La caméra prend une photo de l’objet pour chaque laser allumé individuellement, ainsi qu'une photo lorsqu’ils sont éteints. La soustraction d'une image laser allumé et lasers éteints permet d'extraire grossièrement le tracé laser en question. Il faut donc ensuite appliquer tout une série de filtres afin d'épurer ce tracé. Pour ce faire, nous appliquons des filtres de couleurs RGB, de saturations HSV ainsi que des filtres basiques de seuil, de flou Gaussien et médian. Finalement, nous réduisons le tracé à un unique pixel en largeur grâce à une moyenne pondérée en fonction de l'intensité du pixel par rapport à sa position.
 
 \subsection{Triangulation}
-C'est sous ce nom que certains auteurs (\cite{Forsyth} par exemple) nomment la recherche des coordonnées spaciales.\\
-Cette opération a pour but de transformer chaque point 2D du tracé laser extrait précédement en points réelles 3D. Cela consiste donc a déterminer l'intersection du plan laser (déterminé par ses deux vecteurs directeurs) et du rayon lumineux provenant du "plan image" et percutant le capteur de la camera. Il s'agit donc de résoudre un simple système de 3 équations à 3 inconnues:\\
+C'est sous ce nom que certains auteurs (\cite{Forsyth} par exemple) nomment la recherche des coordonnées spatiales.\\
+Cette opération a pour but de transformer chaque point 2D du tracé laser extrait précédement en points 3D. Cela consiste donc a déterminer l'intersection du plan laser (déterminé par ses deux vecteurs directeurs) et du rayon lumineux provenant du "plan image" et percutant le capteur de la camera. Il s'agit donc de résoudre un simple système de 3 équations à 3 inconnues:\\
 
 \begin{equation}
 \begin{pmatrix}
@@ -332,14 +329,14 @@ On obtient alors un nuage de points 3D.
 \end{figure}
 
 \subsection{Ramer-Douglas-Peucker}
-Il est ensuite possible d'appliquer un filtre à la fin de la triangulation, pour réduire le nombre de points. La réduction de la densité du nuage de points permet de réduire considérablement le temps de maillage, mais risque en contrepartie de provoquer plus de trous dans la surface reconstruite\footnote{Ce résultat sera discuté plus loin}. En outre, on souhaite supprimer des points non pas pour atteindre un nombre fixe, mais pour garder les points les plus significatifs. L'algorithme de simplification de ligne de Douglas-Peucker\cite{douglaspeucker} a été créé dans ce but. Nous l'avons implémenté, en sortie de l'étape de triangulation.
+Il est ensuite possible d'appliquer un filtre à la fin de la triangulation, pour réduire le nombre de points. La réduction de la densité du nuage de points permet de considérablement diminuer le temps de maillage, mais risque en contrepartie de provoquer plus de trous dans la surface reconstruite\footnote{Ce résultat sera discuté plus loin}. En outre, on souhaite supprimer des points non pas pour en atteindre un nombre fixe, mais pour garder les points les plus significatifs. L'algorithme de simplification de ligne de Douglas-Peucker\cite{douglaspeucker} a été créé dans ce but. Nous l'avons implémenté, en sortie de l'étape de triangulation.
 
-L'algorithme est appliqué sur chaque tranche correspondant aux points illuminés par un laser sur une photo. Nous savons que tous ces points sont dans le même plan. On les trie verticalement et on applique l'algorithme de Douglas - Peucker.
+L'algorithme est appliqué sur chaque tranche correspondant aux points illuminés par un laser sur une photo. Nous savons donc que tous ces points sont dans le même plan. On les trie verticalement et on applique l'algorithme de Douglas - Peucker:
 
 \begin{enumerate}
-	\item On trouve le point le plus éloigné de la droite reliant les deux points extrêmes de la polyligne
-    \item Si la distance de ce point à la droite est inférieure à un certain seuil, on supprime tous les points intérieurs et l'algorithme s'arrête (\textit{plus aucun point n'est significatif})
-    \item Sinon, on répète l'algorithme récursivement sur les deux polylignes formées par les points extrême et le point le plus éloigné de la ligne (\textit{ce point est significatif})
+	\item On trouve le point $M$ le plus éloigné de la droite $D$ passant par les deux points extrêmes $P_1 et P_2$ de la polyligne
+  \item Si la distance de $M$ à $D$ est inférieure à un certain seuil (paramètre de la procédure), on supprime tous les points intérieurs et l'algorithme s'arrête (\textit{plus aucun point n'est significatif})
+  \item Sinon, on répète l'algorithme récursivement sur les deux polylignes formées par les points entre $P_1$ et $M$ et entre $M$ et $P_2$ (\textit{$M$ est significatif})
 \end{enumerate}
 
 \subsection{Représentation en 3D}
